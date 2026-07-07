@@ -1,0 +1,73 @@
+"""
+DeepForense — forensic-api
+Composition root: aquí (y solo aquí) se instancian los adaptadores concretos
+(Mongo, MinIO, Celery) y se inyectan en los casos de uso. domain/ y
+application/ no conocen esta configuración (regla de arquitectura hexagonal).
+"""
+import os
+
+from celery import Celery
+from fastapi import FastAPI
+from minio import Minio
+from motor.motor_asyncio import AsyncIOMotorClient
+
+from app.application.ports.get_job_input_port import GetJobInputPort
+from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
+from app.application.use_cases.get_job_use_case import GetJobUseCase
+from app.application.use_cases.submit_analysis_use_case import SubmitAnalysisUseCase
+from app.infrastructure.adapter.input.rest.analysis_controller import router as analysis_router
+from app.infrastructure.adapter.output.celery_task_queue_adapter import CeleryTaskQueueAdapter
+from app.infrastructure.adapter.output.minio_storage_adapter import MinioStorageAdapter
+from app.infrastructure.adapter.output.mongo_analysis_job_repository import MongoAnalysisJobRepository
+
+# --- Configuración desde entorno (ver docker-compose.yml / .env.example) ----
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_DB_NAME = os.getenv("MONGO_DB", "deepforense_forensic")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "deepforense")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "changeme123")
+MINIO_BUCKET = os.getenv("MINIO_BUCKET", "deepforense-artifacts")
+# Prefijo con el que Kong expone este servicio detrás del proxy (ver
+# kong/kong.yml, route forensic-docs-route). FastAPI usa root_path para
+# generar correctamente los enlaces absolutos de Swagger UI (/docs) sin
+# afectar el matching de las rutas reales de la app.
+ROOT_PATH = os.getenv("ROOT_PATH", "")
+
+# --- Adaptadores de salida (infrastructure) ---------------------------------
+mongo_client = AsyncIOMotorClient(MONGO_URI)
+analysis_jobs_collection = mongo_client[MONGO_DB_NAME]["analysis_jobs"]
+repository = MongoAnalysisJobRepository(analysis_jobs_collection)
+
+minio_client = Minio(
+    MINIO_ENDPOINT,
+    access_key=MINIO_ACCESS_KEY,
+    secret_key=MINIO_SECRET_KEY,
+    secure=False,
+)
+storage = MinioStorageAdapter(minio_client, bucket=MINIO_BUCKET)
+
+celery_client = Celery("forensic_api_producer", broker=REDIS_URL, backend=REDIS_URL)
+task_queue = CeleryTaskQueueAdapter(celery_client)
+
+# --- Casos de uso (application) --------------------------------------------
+submit_analysis_use_case = SubmitAnalysisUseCase(repository=repository, storage=storage, task_queue=task_queue)
+get_job_use_case = GetJobUseCase(repository=repository)
+
+# --- FastAPI app + wiring de dependencias -----------------------------------
+app = FastAPI(
+    title="DeepForense — forensic-api",
+    version="0.1.0",
+    description="Capa 1 (Ingesta y Extracción) del pipeline forense.",
+    root_path=ROOT_PATH,
+)
+
+app.dependency_overrides[SubmitAnalysisInputPort] = lambda: submit_analysis_use_case
+app.dependency_overrides[GetJobInputPort] = lambda: get_job_use_case
+
+app.include_router(analysis_router)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

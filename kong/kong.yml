@@ -1,0 +1,78 @@
+_format_version: "3.0"
+_transform: true
+
+# Configuración declarativa de Kong para DeepForense (modo DB-less).
+# Enruta /api/auth/* -> auth-service y /api/forensic/* -> forensic-api.
+#
+# Además expone la documentación interactiva (Swagger UI) de cada servicio
+# a través de Kong, para que ningún cliente necesite llamar directo a los
+# puertos internos de auth-service/forensic-api (ver README.md):
+#   - /auth-docs/*     -> auth-service (springdoc / Swagger UI)
+#   - /forensic-docs/* -> forensic-api (FastAPI / Swagger UI)
+#
+# Ambas rutas usan strip_path: true, por lo que el backend recibe la misma
+# ruta que recibiría si se le llamara directo (p.ej. /swagger-ui.html o
+# /docs). Como la app sigue viendo la URL sin el prefijo, el HTML/JS de
+# Swagger UI generado por el framework necesita que se le indique el
+# prefijo externo para poder construir correctamente los enlaces absolutos
+# (openapi.json, assets, etc.) que el navegador solicitará con el prefijo
+# incluido (/auth-docs/... o /forensic-docs/...):
+#   - forensic-api: se le pasa root_path="/forensic-docs" (parámetro nativo
+#     de FastAPI para funcionar detrás de un proxy con prefijo), ver
+#     forensic-api/app/main.py y la variable de entorno ROOT_PATH.
+#   - auth-service: springdoc no tiene un equivalente a root_path que sea
+#     independiente del contexto global, así que se usa el mecanismo
+#     estándar de Spring (server.forward-headers-strategy: framework +
+#     header X-Forwarded-Prefix), inyectado únicamente en la ruta
+#     auth-docs-route mediante el plugin request-transformer.
+
+services:
+  - name: auth-service
+    url: http://auth-service:8080
+    routes:
+      - name: auth-routes
+        paths:
+          - /api/auth
+        strip_path: false
+
+      - name: auth-docs-route
+        paths:
+          - /auth-docs
+        strip_path: true
+        plugins:
+          - name: request-transformer
+            config:
+              add:
+                headers:
+                  - "X-Forwarded-Prefix:/auth-docs"
+
+  - name: forensic-api
+    url: http://forensic-api:8000
+    routes:
+      - name: forensic-routes
+        paths:
+          - /api/forensic
+        strip_path: false
+
+      - name: forensic-docs-route
+        paths:
+          - /forensic-docs
+        strip_path: true
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "http://localhost:5173"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+      credentials: true
+      max_age: 3600
