@@ -1,0 +1,50 @@
+# DeepForense — Override de desarrollo local.
+# Docker Compose lo carga automáticamente junto a docker-compose.yml cuando
+# corres "docker compose up" sin -f. Aquí vive todo lo que NO debe llegar a
+# main: puertos de bases de datos publicados al host, Admin API de Kong,
+# Swagger UI standalone, y el servidor de desarrollo de Vite.
+
+services:
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  mongo:
+    ports:
+      - "27017:27017"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  minio:
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Consola web
+
+  kong:
+    ports:
+      - "8001:8001"   # Admin API (solo desarrollo)
+
+  frontend:
+    build:
+      target: dev
+    ports:
+      - "5173:5173"
+
+  # ------------------------------------------------------------------
+  # Swagger UI unificado: sirve docs/openapi.yaml (contrato completo,
+  # auth-service + forensic-api) sin depender de cada framework.
+  # Solo para desarrollo: no se despliega en main.
+  # ------------------------------------------------------------------
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: deepforense-swagger-ui
+    restart: unless-stopped
+    environment:
+      SWAGGER_JSON: /openapi.yaml
+    volumes:
+      - ./docs/openapi.yaml:/openapi.yaml:ro
+    ports:
+      - "8085:8080"

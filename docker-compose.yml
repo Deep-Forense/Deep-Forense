@@ -1,7 +1,7 @@
-version: "3.9"
-
-# DeepForense — Docker Compose base (entorno de desarrollo local)
-# Levanta toda la infraestructura + los 4 microservicios del MVP.
+# DeepForense — Docker Compose base (común a todos los entornos)
+# Sin puertos de infraestructura publicados al host: eso vive en
+# docker-compose.override.yml (autocargado en local) para no repetirlo en
+# docker-compose.prod.yml. Ver README.md para los comandos de cada entorno.
 
 services:
 
@@ -16,8 +16,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-deepforense_auth}
       POSTGRES_USER: ${POSTGRES_USER:-deepforense}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -34,8 +32,6 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-deepforense}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
       MONGO_INITDB_DATABASE: ${MONGO_DB:-deepforense_forensic}
-    ports:
-      - "27017:27017"
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -52,8 +48,6 @@ services:
     # snapshots RDB de respaldo. Sin esto, cualquier tarea encolada que
     # forensic-worker no haya consumido aún se pierde si el contenedor se reinicia.
     command: redis-server --appendonly yes --appendfsync everysec --save 60 1000
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -70,9 +64,6 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-deepforense}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme123}
-    ports:
-      - "9000:9000"   # API
-      - "9001:9001"   # Consola web
     volumes:
       - minio_data:/data
     healthcheck:
@@ -121,7 +112,6 @@ services:
       - ./kong/kong.yml:/kong/kong.yml:ro
     ports:
       - "8000:8000"   # Proxy (entrada única del frontend)
-      - "8001:8001"   # Admin API (solo desarrollo)
     depends_on:
       - auth-service
       - forensic-api
@@ -201,33 +191,15 @@ services:
         condition: service_healthy
 
   # ------------------------------------------------------------------
-  # Swagger UI unificado: sirve docs/openapi.yaml (contrato completo,
-  # auth-service + forensic-api) sin depender de cada framework.
-  # ------------------------------------------------------------------
-  swagger-ui:
-    image: swaggerapi/swagger-ui:latest
-    container_name: deepforense-swagger-ui
-    restart: unless-stopped
-    environment:
-      SWAGGER_JSON: /openapi.yaml
-    volumes:
-      - ./docs/openapi.yaml:/openapi.yaml:ro
-    ports:
-      - "8085:8080"
-
-  # ------------------------------------------------------------------
   # Frontend
+  # Sin "ports" ni "build.target" aquí: cada entorno decide el target
+  # (dev/prod) y el mapeo de puerto en su propio archivo compose.
   # ------------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
-      target: dev
     container_name: deepforense-frontend
     restart: unless-stopped
-    environment:
-      VITE_API_BASE_URL: http://localhost:8000
-    ports:
-      - "5173:5173"
     depends_on:
       - kong
 
