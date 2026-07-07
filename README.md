@@ -12,7 +12,9 @@ deepforense/
 ├── frontend/           React + Vite + TypeScript
 ├── kong/               Configuración declarativa de Kong (kong.yml)
 ├── docs/               SRS, OpenAPI, arquitectura consolidada
-├── docker-compose.yml
+├── docker-compose.yml           # base, común a todos los entornos
+├── docker-compose.override.yml  # solo local (autocargado por Docker Compose)
+├── docker-compose.prod.yml      # solo main, se invoca explícitamente
 └── .env.example
 ```
 
@@ -31,7 +33,7 @@ infrastructure/
 - Docker y Docker Compose
 - (Opcional para desarrollo fuera de Docker) Java 21, Python 3.11, Node 20
 
-## Cómo levantar el proyecto
+## Cómo levantar el proyecto (local / desarrollo)
 
 ```bash
 git clone <repo-url>
@@ -42,11 +44,11 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Servicios expuestos:
+Docker Compose carga automáticamente `docker-compose.yml` + `docker-compose.override.yml` (no hace falta `-f`). Servicios expuestos:
 
 | Servicio | URL |
 |---|---|
-| Frontend | http://localhost:5173 |
+| Frontend (Vite, hot-reload) | http://localhost:5173 |
 | Kong (entrada única de la API) | http://localhost:8000 |
 | Kong Admin API (solo dev) | http://localhost:8001 |
 | MinIO Consola | http://localhost:9001 |
@@ -55,6 +57,14 @@ Servicios expuestos:
 | Swagger UI de auth-service (springdoc, autogenerado, vía Kong) | http://localhost:8000/auth-docs/swagger-ui.html |
 
 **Importante:** el frontend y cualquier cliente externo deben llamar siempre a través de Kong (`http://localhost:8000/...`), nunca directo a `auth-service` o `forensic-api`. Ambos servicios solo exponen su puerto dentro de la red interna de Docker (`expose`, sin `ports`), por lo que no son alcanzables directo desde el host. Kong enruta, además de `/api/auth/*` y `/api/forensic/*`, la documentación interactiva de cada servicio bajo `/auth-docs/*` y `/forensic-docs/*` (ver `kong/kong.yml`).
+
+## Cómo se despliega en producción (main)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Diferencias clave respecto a local: el frontend se sirve compilado (build estático + nginx, sin servidor de Vite) en el puerto 80, y **no** se publican al host los puertos de Postgres/Mongo/Redis/MinIO ni el Admin API de Kong — solo Kong (`8000`) queda accesible desde fuera de la instancia.
 
 ## Documentación
 
