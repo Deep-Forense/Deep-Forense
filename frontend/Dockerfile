@@ -3,8 +3,8 @@
 # --- Etapa dev: servidor de Vite con hot-reload (uso local, docker-compose.yml) ---
 FROM node:20-alpine AS dev
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
@@ -15,8 +15,8 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 # contenedor final (a diferencia del target "dev", que sí la lee en runtime).
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
