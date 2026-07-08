@@ -1,0 +1,376 @@
+openapi: 3.0.3
+info:
+  title: DeepForense API
+  description: >
+    Contrato de API para DeepForense, expuesto a través de Kong API Gateway.
+    Agrupa las rutas de auth-service (/api/auth/*) y forensic-api (/api/forensic/*).
+    Este documento es el acuerdo entre frontend y backend: define request/response
+    exactos para que los 3 integrantes puedan trabajar en paralelo sin divergir.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:8000
+    description: Kong API Gateway (entorno local vía Docker Compose)
+
+tags:
+  - name: auth
+    description: Registro, login y sesión (auth-service)
+  - name: forensic
+    description: Envío y consulta de análisis (forensic-api)
+
+paths:
+  # ---------------------------------------------------------------------
+  # AUTH SERVICE
+  # ---------------------------------------------------------------------
+  /api/auth/register:
+    post:
+      tags: [auth]
+      summary: Registrar un nuevo usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, example: "Victor Andrade" }
+                email: { type: string, format: email, example: "victor@uce.edu.ec" }
+                password: { type: string, format: password, minLength: 8 }
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPublic"
+        "409":
+          description: Correo ya registrado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "422":
+          description: Datos inválidos
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Iniciar sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string, example: "Bearer" }
+                  expires_in: { type: integer, example: 3600 }
+                  user: { $ref: "#/components/schemas/UserPublic" }
+        "401":
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: Cerrar sesión
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Sesión cerrada }
+        "401":
+          description: No autenticado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: Obtener el usuario autenticado actual
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Usuario actual
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserPublic" }
+        "401":
+          description: Token inválido o ausente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  # ---------------------------------------------------------------------
+  # FORENSIC API
+  # ---------------------------------------------------------------------
+  /api/forensic/demo/analyze:
+    post:
+      tags: [forensic]
+      summary: Crear un análisis demo (sin autenticación)
+      description: >
+        Acepta multipart/form-data con un archivo (imagen o PDF) O un campo `url`.
+        No requiere JWT. user_id queda nulo en el job creado.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Imagen (jpg/png) o documento (pdf). Excluyente con `url`.
+                url:
+                  type: string
+                  format: uri
+                  description: URL a analizar. Excluyente con `file`.
+              example:
+                url: "https://ejemplo.com/anuncio-sospechoso"
+      responses:
+        "202":
+          description: Job creado y encolado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobCreated" }
+        "400":
+          description: Ni `file` ni `url` provistos, o ambos a la vez
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "415":
+          description: Formato de archivo no soportado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /api/forensic/analyze:
+    post:
+      tags: [forensic]
+      summary: Crear un análisis autenticado
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                url: { type: string, format: uri }
+      responses:
+        "202":
+          description: Job creado y encolado, asociado al usuario autenticado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobCreated" }
+        "400":
+          description: Entrada inválida
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401":
+          description: No autenticado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /api/forensic/jobs/{job_id}:
+    get:
+      tags: [forensic]
+      summary: Consultar estado y resultado de un job
+      description: >
+        Si el job pertenece a un usuario autenticado y la petición incluye su JWT,
+        devuelve el reporte detallado (`detail_level=full`). En caso contrario,
+        devuelve el reporte básico (`detail_level=basic`).
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Estado/resultado del job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobResult" }
+        "403":
+          description: El job pertenece a otro usuario
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "404":
+          description: Job no encontrado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /api/forensic/jobs:
+    get:
+      tags: [forensic]
+      summary: Listar el historial de análisis del usuario autenticado
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: verdict
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [APPROVED, SUSPICIOUS, REJECTED]
+          description: Filtrar por veredicto
+      responses:
+        "200":
+          description: Listado paginado de jobs del usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  total: { type: integer }
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/JobSummary" }
+        "401":
+          description: No autenticado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        error_code: { type: string, example: "INVALID_INPUT" }
+        message: { type: string, example: "Debe proveerse 'file' o 'url', no ambos." }
+
+    UserPublic:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        created_at: { type: string, format: date-time }
+
+    JobCreated:
+      type: object
+      properties:
+        job_id: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING], example: "PENDING" }
+        artifacts_count: { type: integer, example: 3 }
+        created_at: { type: string, format: date-time }
+
+    JobSummary:
+      type: object
+      properties:
+        job_id: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, PROCESSING, COMPLETED, FAILED] }
+        verdict:
+          type: string
+          enum: [APPROVED, SUSPICIOUS, REJECTED]
+          nullable: true
+        fraud_score: { type: number, format: float, nullable: true, example: 0.68 }
+        input_source: { type: string, enum: [UPLOAD, URL] }
+        created_at: { type: string, format: date-time }
+
+    ArtifactResultBasic:
+      type: object
+      description: Vista mínima de un artifact (para reporte básico, sin login)
+      properties:
+        artifact_id: { type: string }
+        type: { type: string, enum: [TEXT, IMAGE] }
+
+    ArtifactResultFull:
+      type: object
+      description: Vista completa de un artifact (para reporte detallado, con login)
+      properties:
+        artifact_id: { type: string }
+        type: { type: string, enum: [TEXT, IMAGE] }
+        origin: { type: string, enum: [UPLOAD, SCRAPED_DOM, SCRAPED_DOM_IMAGE] }
+        status: { type: string, enum: [COMPLETED, FAILED] }
+        analysis:
+          type: object
+          description: Campos variables según el tipo de artifact (TEXT o IMAGE)
+          properties:
+            document_type: { type: string, nullable: true }
+            financial_amounts:
+              type: array
+              items: { type: number }
+              nullable: true
+            ai_flags:
+              type: array
+              items: { type: string }
+            benford_applicable: { type: boolean, nullable: true }
+            benford_score: { type: number, nullable: true }
+            exif_score: { type: number, nullable: true }
+            ela_score: { type: number, nullable: true }
+            dct_benford_score: { type: number, nullable: true }
+            gemini_flags:
+              type: array
+              items: { type: string }
+
+    JobResult:
+      type: object
+      properties:
+        job_id: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, PROCESSING, COMPLETED, FAILED] }
+        detail_level: { type: string, enum: [basic, full] }
+        input_source: { type: string, enum: [UPLOAD, URL] }
+        consolidated:
+          type: object
+          nullable: true
+          properties:
+            fraud_score: { type: number, format: float, example: 0.68 }
+            authenticity_percentage: { type: integer, example: 32 }
+            risk_percentage: { type: integer, example: 68 }
+            verdict: { type: string, enum: [APPROVED, SUSPICIOUS, REJECTED] }
+            dominant_artifact:
+              type: string
+              nullable: true
+              description: Solo presente en detail_level=full
+            policy_applied:
+              type: string
+              nullable: true
+              description: Solo presente en detail_level=full
+        artifacts:
+          type: array
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/ArtifactResultBasic"
+              - $ref: "#/components/schemas/ArtifactResultFull"
+        created_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true }

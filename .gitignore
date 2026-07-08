@@ -1,0 +1,30 @@
+# Entornos
+.env
+*.env.local
+
+# Node / Frontend
+node_modules/
+dist/
+frontend/dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Java / Maven
+target/
+*.class
+
+# Docker
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.iml

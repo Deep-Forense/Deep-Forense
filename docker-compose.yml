@@ -1,0 +1,218 @@
+# DeepForense — Docker Compose base (común a todos los entornos)
+# Sin puertos de infraestructura publicados al host: eso vive en
+# docker-compose.override.yml (autocargado en local) para no repetirlo en
+# docker-compose.prod.yml. Ver README.md para los comandos de cada entorno.
+
+# Nombre de proyecto fijo: sin esto, Docker Compose deriva el nombre de las
+# imagenes (ej. "deepforense-auth-service") del nombre de la carpeta donde
+# corre. Como el checkout de GitHub Actions y la carpeta en la instancia de
+# main tienen nombres distintos al de esta carpeta local, el CD (build en el
+# runner, docker load en la instancia) necesita que el nombre sea siempre el
+# mismo sin importar dónde se ejecute.
+name: deepforense
+
+services:
+
+  # ------------------------------------------------------------------
+  # Infraestructura
+  # ------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: deepforense-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-deepforense_auth}
+      POSTGRES_USER: ${POSTGRES_USER:-deepforense}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deepforense} -d ${POSTGRES_DB:-deepforense_auth}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    container_name: deepforense-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-deepforense}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-deepforense_forensic}
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: deepforense-redis
+    restart: unless-stopped
+    # Persistencia: AOF (append-only file, se re-sincroniza cada segundo) +
+    # snapshots RDB de respaldo. Sin esto, cualquier tarea encolada que
+    # forensic-worker no haya consumido aún se pierde si el contenedor se reinicia.
+    command: redis-server --appendonly yes --appendfsync everysec --save 60 1000
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: deepforense-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-deepforense}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme123}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ------------------------------------------------------------------
+  # T0.2 (historia FOR-125): crea el bucket deepforense-artifacts al iniciar.
+  # Contenedor one-shot: corre, crea el bucket si no existe, y termina.
+  # ------------------------------------------------------------------
+  minio-init:
+    image: minio/mc:latest
+    container_name: deepforense-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-deepforense}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-deepforense-artifacts}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+      (mc mb local/$$MINIO_BUCKET || true) &&
+      echo 'Bucket listo: '$$MINIO_BUCKET
+      "
+
+  # ------------------------------------------------------------------
+  # Kong API Gateway (modo DB-less, config declarativa en kong/kong.yml)
+  # ------------------------------------------------------------------
+  kong:
+    image: kong:3.7
+    container_name: deepforense-kong
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    volumes:
+      - ./kong/kong.yml:/kong/kong.yml:ro
+    ports:
+      - "8000:8000"   # Proxy (entrada única del frontend)
+    depends_on:
+      - auth-service
+      - forensic-api
+
+  # ------------------------------------------------------------------
+  # Microservicios de negocio
+  # ------------------------------------------------------------------
+  auth-service:
+    build:
+      context: ./auth-service
+    container_name: deepforense-auth-service
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-deepforense_auth}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-deepforense}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8080"
+
+  forensic-api:
+    build:
+      context: ./forensic-api
+    container_name: deepforense-forensic-api
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://${MONGO_ROOT_USER:-deepforense}:${MONGO_ROOT_PASSWORD:-changeme}@mongo:27017/${MONGO_DB:-deepforense_forensic}?authSource=admin
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-deepforense}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-changeme123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-deepforense-artifacts}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      SCRAPFLY_API_KEY: ${SCRAPFLY_API_KEY:-}
+      MAX_IMAGES_PER_JOB: ${MAX_IMAGES_PER_JOB:-5}
+      ROOT_PATH: /forensic-docs
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    expose:
+      - "8000"
+
+  forensic-worker:
+    build:
+      context: ./forensic-worker
+    container_name: deepforense-forensic-worker
+    restart: unless-stopped
+    command: celery -A app.worker worker --loglevel=info --concurrency=4
+    environment:
+      MONGO_URI: mongodb://${MONGO_ROOT_USER:-deepforense}:${MONGO_ROOT_PASSWORD:-changeme}@mongo:27017/${MONGO_DB:-deepforense_forensic}?authSource=admin
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-deepforense}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-changeme123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-deepforense-artifacts}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_OCR_DEEPINFRA_API_KEY: ${DEEPSEEK_OCR_DEEPINFRA_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      BENFORD_MIN_AMOUNT_COUNT: ${BENFORD_MIN_AMOUNT_COUNT:-15}
+      CONSOLIDATION_POLICY: ${CONSOLIDATION_POLICY:-worst_case_dominates}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # ------------------------------------------------------------------
+  # Frontend
+  # Sin "ports" ni "build.target" aquí: cada entorno decide el target
+  # (dev/prod) y el mapeo de puerto en su propio archivo compose.
+  # ------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+    container_name: deepforense-frontend
+    restart: unless-stopped
+    depends_on:
+      - kong
+
+volumes:
+  postgres_data:
+  mongo_data:
+  minio_data:
+  redis_data:
