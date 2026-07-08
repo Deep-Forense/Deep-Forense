@@ -22,6 +22,8 @@ from app.domain.ports.text_cognitive_analyzer_port import (
     TextCognitiveResult,
 )
 from app.domain.services.benford_applicability_service import BenfordApplicabilityService
+from app.domain.services.consolidation_service import ConsolidationService
+from app.domain.services.fraud_scoring_service import FraudScoringService
 
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
@@ -121,6 +123,8 @@ def _use_case(repository, storage, ela=None, text_analyzer=None) -> ProcessAnaly
         text_analyzer=text_analyzer or FakeTextAnalyzer(),
         image_analyzer=FakeImageAnalyzer(),
         benford_applicability=BenfordApplicabilityService(min_amount_count=15),
+        fraud_scoring=FraudScoringService(),
+        consolidation=ConsolidationService(),  # worst_case_dominates default
     )
 
 
@@ -140,6 +144,10 @@ async def test_failing_artifact_does_not_stop_the_others():
     assert repository.saved_results["a-txt"][0] == "COMPLETED"
     assert result["status"] == "COMPLETED"  # al menos 1 completó
     assert repository.final[0] == "COMPLETED"
+    # Sprint 3: la consolidación real solo considera los artifacts completados.
+    consolidated = repository.final[1]
+    assert consolidated["policy_applied"] == "worst_case_dominates"
+    assert consolidated["dominant_artifact"] == "a-txt"
 
 
 async def test_job_fails_only_if_all_artifacts_fail():

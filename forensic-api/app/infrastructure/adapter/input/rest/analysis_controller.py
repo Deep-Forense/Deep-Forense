@@ -13,6 +13,7 @@ from app.application.ports.get_job_input_port import GetJobInputPort
 from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
 from app.application.ports.submit_url_analysis_input_port import SubmitUrlAnalysisInputPort
 from app.domain.exceptions import UnsupportedUrlContentError, UrlDownloadError
+from app.infrastructure.adapter.input.rest.security import optional_user_id, require_user_id
 
 router = APIRouter(prefix="/api/forensic")
 
@@ -39,13 +40,13 @@ async def _submit(
         )
 
     if url is not None:
-        # FOR-97 (HU3.2): URL directa a imagen/PDF. El caso HTML (scraping
-        # vía Scrapfly + ArtifactSelectionService) es Sprint 3 (FOR-98/T3.M1).
+        # FOR-97 (HU3.2): URL directa a imagen/PDF -> 1 artifact.
+        # FOR-98 (HU3.3): página HTML -> scraping (1 TEXT + hasta N IMAGE).
         try:
-            job_id = await url_use_case.execute(SubmitUrlAnalysisCommand(user_id=user_id, url=url))
+            job = await url_use_case.execute(SubmitUrlAnalysisCommand(user_id=user_id, url=url))
         except (UnsupportedUrlContentError, UrlDownloadError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return {"job_id": job_id, "status": "PENDING", "artifacts_count": 1}
+        return {"job_id": job.job_id, "status": "PENDING", "artifacts_count": len(job.artifacts)}
 
     content = await file.read()
     command = SubmitAnalysisCommand(
@@ -74,29 +75,49 @@ async def analyze(
     url: Optional[str] = Form(default=None),
     use_case: SubmitAnalysisInputPort = Depends(),
     url_use_case: SubmitUrlAnalysisInputPort = Depends(),
+    user_id: str = Depends(require_user_id),
 ):
-    """Igual que /demo/analyze pero requiere JWT (T1.P3 valida el token en Kong/
-    middleware; aquí se asumiría el user_id ya resuelto del token)."""
-    # TODO Sprint 1: extraer user_id del JWT validado
-    return await _submit(None, file, url, use_case, url_use_case)
+    """Igual que /demo/analyze pero requiere JWT: el job queda asociado al
+    userId del token (emitido por auth-service), lo que habilita
+    detail_level=full en GET /jobs/{job_id}."""
+    return await _submit(user_id, file, url, use_case, url_use_case)
+
+
+def _consolidated_view(consolidated: Optional[dict], full: bool) -> Optional[dict]:
+    if consolidated is None or full:
+        return consolidated
+    # dominant_artifact y policy_applied solo se exponen en detail_level=full
+    # (contrato JobResult de docs/openapi.yaml).
+    return {k: v for k, v in consolidated.items() if k not in ("dominant_artifact", "policy_applied")}
+
+
+def _artifact_view(artifact, full: bool) -> dict:
+    view = {"artifact_id": artifact.artifact_id, "type": str(artifact.type), "status": artifact.status}
+    if full:
+        view["origin"] = artifact.origin
+        view["analysis"] = artifact.analysis
+    return view
 
 
 @router.get("/jobs/{job_id}")
-async def get_job(job_id: str, use_case: GetJobInputPort = Depends()):
+async def get_job(
+    job_id: str,
+    use_case: GetJobInputPort = Depends(),
+    user_id: Optional[str] = Depends(optional_user_id),
+):
     job = await use_case.execute(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job no encontrado.")
 
-    detail_level = "basic"  # TODO Sprint 1: "full" si el JWT corresponde al dueño del job
-    artifacts = [
-        {"artifact_id": a.artifact_id, "type": str(a.type), "status": a.status} for a in job.artifacts
-    ]
+    # full solo si el JWT corresponde al dueño del job (jobs de demo no tienen dueño).
+    full = user_id is not None and job.user_id == user_id
+    detail_level = "full" if full else "basic"
     return {
         "job_id": job.job_id,
         "status": job.status,
         "detail_level": detail_level,
-        "consolidated": job.consolidated,
-        "artifacts": artifacts,
+        "consolidated": _consolidated_view(job.consolidated, full),
+        "artifacts": [_artifact_view(a, full) for a in job.artifacts],
         "created_at": job.created_at,
         "completed_at": job.completed_at,
     }

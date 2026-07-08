@@ -17,11 +17,14 @@ from app.application.ports.submit_url_analysis_input_port import SubmitUrlAnalys
 from app.application.use_cases.get_job_use_case import GetJobUseCase
 from app.application.use_cases.submit_analysis_use_case import SubmitAnalysisUseCase
 from app.application.use_cases.submit_url_analysis_use_case import SubmitUrlAnalysisUseCase
+from app.domain.services.artifact_selection_service import ArtifactSelectionService
 from app.infrastructure.adapter.input.rest.analysis_controller import router as analysis_router
 from app.infrastructure.adapter.output.celery_task_queue_adapter import CeleryTaskQueueAdapter
 from app.infrastructure.adapter.output.httpx_url_downloader_adapter import HttpxUrlDownloaderAdapter
 from app.infrastructure.adapter.output.minio_storage_adapter import MinioStorageAdapter
 from app.infrastructure.adapter.output.mongo_analysis_job_repository import MongoAnalysisJobRepository
+from app.infrastructure.adapter.output.pillow_image_inspector_adapter import PillowImageInspectorAdapter
+from app.infrastructure.adapter.output.scrapfly_scraper_adapter import ScrapflyScraperAdapter
 
 # --- Configuración desde entorno (ver docker-compose.yml / .env.example) ----
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
@@ -31,6 +34,8 @@ MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "deepforense")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "changeme123")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "deepforense-artifacts")
+SCRAPFLY_API_KEY = os.getenv("SCRAPFLY_API_KEY", "")
+MAX_IMAGES_PER_JOB = int(os.getenv("MAX_IMAGES_PER_JOB", "5"))
 # Prefijo con el que Kong expone este servicio detrás del proxy (ver
 # kong/kong.yml, route forensic-docs-route). FastAPI usa root_path para
 # generar correctamente los enlaces absolutos de Swagger UI (/docs) sin
@@ -57,7 +62,13 @@ task_queue = CeleryTaskQueueAdapter(celery_client)
 submit_analysis_use_case = SubmitAnalysisUseCase(repository=repository, storage=storage, task_queue=task_queue)
 url_downloader = HttpxUrlDownloaderAdapter()
 submit_url_analysis_use_case = SubmitUrlAnalysisUseCase(
-    repository=repository, storage=storage, task_queue=task_queue, downloader=url_downloader
+    repository=repository,
+    storage=storage,
+    task_queue=task_queue,
+    downloader=url_downloader,
+    scraper=ScrapflyScraperAdapter(api_key=SCRAPFLY_API_KEY),
+    image_inspector=PillowImageInspectorAdapter(),
+    artifact_selection=ArtifactSelectionService(max_candidates=MAX_IMAGES_PER_JOB),
 )
 get_job_use_case = GetJobUseCase(repository=repository)
 

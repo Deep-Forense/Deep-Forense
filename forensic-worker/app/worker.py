@@ -12,9 +12,9 @@ La tarea Celery `process_analysis_job` es un adaptador de entrada delgado:
 construye el caso de uso y lo ejecuta con asyncio.run (el pipeline es async
 para procesar los artifacts de un job en paralelo — T2.M8).
 
-TODO Sprint 3 (Capa 3): FraudScoringService + ConsolidationService con la
-política worst_case_dominates (FOR-112/T3.M4) reemplazan el consolidated
-placeholder del use case.
+Sprint 3 (Capa 3): FraudScoringService (FOR-111) + ConsolidationService
+(FOR-112/113) con política configurable vía CONSOLIDATION_POLICY
+(worst_case_dominates por default; weighted_average solo si se configura).
 """
 import asyncio
 import os
@@ -25,6 +25,8 @@ from pymongo import MongoClient
 
 from app.application.use_cases.process_analysis_job_use_case import ProcessAnalysisJobUseCase
 from app.domain.services.benford_applicability_service import BenfordApplicabilityService
+from app.domain.services.consolidation_service import ConsolidationService
+from app.domain.services.fraud_scoring_service import FraudScoringService
 from app.infrastructure.adapter.output.benford_statistical_adapter import BenfordStatisticalAdapter
 from app.infrastructure.adapter.output.deepseek_analyzer_adapter import DeepSeekAnalyzerAdapter
 from app.infrastructure.adapter.output.deepseek_ocr_adapter import DeepSeekOcrAdapter
@@ -51,6 +53,7 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_OCR_DEEPINFRA_API_KEY = os.getenv("DEEPSEEK_OCR_DEEPINFRA_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 BENFORD_MIN_AMOUNT_COUNT = int(os.getenv("BENFORD_MIN_AMOUNT_COUNT", "15"))
+CONSOLIDATION_POLICY = os.getenv("CONSOLIDATION_POLICY", "worst_case_dominates")
 
 celery_app = Celery(
     "forensic_worker",
@@ -93,6 +96,8 @@ def build_process_job_use_case() -> ProcessAnalysisJobUseCase:
         benford_applicability=BenfordApplicabilityService(
             min_amount_count=BENFORD_MIN_AMOUNT_COUNT
         ),
+        fraud_scoring=FraudScoringService(),
+        consolidation=ConsolidationService(policy=CONSOLIDATION_POLICY),
     )
 
 

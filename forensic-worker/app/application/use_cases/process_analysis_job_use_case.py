@@ -11,9 +11,10 @@ Orquesta el pipeline forense de un job completo:
             (si JPEG) DctAnalyzerPort -> BenfordAnalyzerPort +
             ImageCognitiveAnalyzerPort (gemini_flags).
   4. Job COMPLETED si al menos 1 artifact completó; FAILED solo si TODOS
-     fallaron. El `consolidated` es un placeholder simple de Sprint 2:
-     la consolidación real (FraudScoringService + ConsolidationService con
-     worst_case_dominates) es Sprint 3 (FOR-112/T3.M4) — NO tocar aquí.
+     fallaron (FOR-114). Capa 3 (Sprint 3): FraudScoringService (FOR-111)
+     puntúa cada artifact completado y ConsolidationService (FOR-112/113)
+     consolida el job según la política configurada (worst_case_dominates
+     por default, weighted_average si se configura explícitamente).
 
 Solo conoce puertos (inversión de dependencias): sin Celery, Mongo, MinIO,
 OpenCV ni HTTP en este nivel.
@@ -34,22 +35,10 @@ from app.domain.ports.ocr_port import OcrPort
 from app.domain.ports.storage_port import StoragePort
 from app.domain.ports.text_cognitive_analyzer_port import TextCognitiveAnalyzerPort
 from app.domain.services.benford_applicability_service import BenfordApplicabilityService
+from app.domain.services.consolidation_service import ConsolidationService, ScoredArtifact
+from app.domain.services.fraud_scoring_service import FraudScoringService
 
 logger = logging.getLogger(__name__)
-
-# Umbrales del veredicto placeholder (mismos del mock de Sprint 1; la política
-# real worst_case_dominates llega en Sprint 3 / T3.M4).
-_VERDICT_APPROVED_BELOW = 0.4
-_VERDICT_REJECTED_ABOVE = 0.7
-_PLACEHOLDER_POLICY = "sprint2_placeholder_average"
-
-
-def _placeholder_verdict(fraud_score: float) -> str:
-    if fraud_score < _VERDICT_APPROVED_BELOW:
-        return "APPROVED"
-    if fraud_score > _VERDICT_REJECTED_ABOVE:
-        return "REJECTED"
-    return "SUSPICIOUS"
 
 
 class ProcessAnalysisJobUseCase:
@@ -65,6 +54,8 @@ class ProcessAnalysisJobUseCase:
         text_analyzer: TextCognitiveAnalyzerPort,
         image_analyzer: ImageCognitiveAnalyzerPort,
         benford_applicability: BenfordApplicabilityService,
+        fraud_scoring: FraudScoringService,
+        consolidation: ConsolidationService,
     ) -> None:
         self._repository = repository
         self._storage = storage
@@ -76,6 +67,8 @@ class ProcessAnalysisJobUseCase:
         self._text_analyzer = text_analyzer
         self._image_analyzer = image_analyzer
         self._benford_applicability = benford_applicability
+        self._fraud_scoring = fraud_scoring
+        self._consolidation = consolidation
 
     async def execute(self, job_id: str) -> dict:
         status = await self._repository.get_job_status(job_id)
@@ -93,9 +86,26 @@ class ProcessAnalysisJobUseCase:
             *(self._process_artifact_safe(job_id, artifact) for artifact in artifacts)
         )
 
-        completed = [analysis for analysis in results if analysis is not None]
-        job_status = "COMPLETED" if completed else "FAILED"
-        consolidated = self._placeholder_consolidated(artifacts, results) if completed else None
+        # FOR-114: el job solo es FAILED si TODOS los artifacts fallaron.
+        completed_pairs = [
+            (artifact, analysis)
+            for artifact, analysis in zip(artifacts, results)
+            if analysis is not None
+        ]
+        job_status = "COMPLETED" if completed_pairs else "FAILED"
+
+        # Capa 3 (FOR-111 + FOR-112/113): scoring por artifact + consolidación.
+        consolidated = None
+        if completed_pairs:
+            scored = [
+                ScoredArtifact(
+                    artifact_id=artifact.artifact_id,
+                    type=artifact.type,
+                    fraud_score=self._fraud_scoring.score(analysis),
+                )
+                for artifact, analysis in completed_pairs
+            ]
+            consolidated = self._consolidation.consolidate(scored)
 
         await self._repository.complete_job(job_id, job_status, consolidated)
         return {"job_id": job_id, "status": job_status, "consolidated": consolidated}
@@ -174,29 +184,3 @@ class ProcessAnalysisJobUseCase:
             gemini_flags=list(gemini_flags),
         )
 
-    @staticmethod
-    def _placeholder_consolidated(artifacts: list, results: list) -> dict:
-        """Consolidated placeholder de Sprint 2: promedio simple de las señales
-        numéricas de los artifacts completados. La política real
-        (worst_case_dominates) es FOR-112/T3.M4 — Sprint 3."""
-        scores = [score for analysis in results if analysis is not None for score in analysis.numeric_scores()]
-        fraud_score = round(sum(scores) / len(scores), 4) if scores else 0.0
-
-        dominant = None
-        best = -1.0
-        for artifact, analysis in zip(artifacts, results):
-            if analysis is None:
-                continue
-            artifact_max = max(analysis.numeric_scores(), default=0.0)
-            if artifact_max > best:
-                best = artifact_max
-                dominant = artifact.artifact_id
-
-        return {
-            "fraud_score": fraud_score,
-            "authenticity_percentage": round((1 - fraud_score) * 100),
-            "risk_percentage": round(fraud_score * 100),
-            "verdict": _placeholder_verdict(fraud_score),
-            "dominant_artifact": dominant,
-            "policy_applied": _PLACEHOLDER_POLICY,
-        }
