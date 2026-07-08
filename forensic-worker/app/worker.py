@@ -1,33 +1,56 @@
 """
 DeepForense — forensic-worker
-Define la app de Celery y la tarea principal `process_analysis_job`.
+Composition root + adaptador de entrada (Celery).
 
-Sprint 1 (T1.M4): implementación MOCK — marca el job como COMPLETED con un
-fraud_score fijo, sin pipeline real de IA/forense todavía. Esto valida que
-la tubería completa (frontend -> Kong -> forensic-api -> Redis ->
-forensic-worker -> Mongo) funciona de punta a punta.
+Sprint 2: pipeline forense REAL por artifact (Capa 2), reemplazando el mock
+de Sprint 1. Aquí (y solo aquí) se instancian los adaptadores concretos
+(Mongo, MinIO, OpenCV, Pillow, DeepSeek, Gemini) y se inyectan en
+ProcessAnalysisJobUseCase — domain/ y application/ no conocen esta
+configuración (regla de arquitectura hexagonal, igual que forensic-api).
 
-TODO Sprint 2 (Capa 2, por artifact, en paralelo):
-  - TEXT  -> OcrPort (DeepSeekOcrAdapter) -> TextCognitiveAnalyzerPort (DeepSeekAnalyzerAdapter)
-  - IMAGE -> ExifAnalyzerPort, ElaAnalyzerPort, DctAnalyzerPort, ImageCognitiveAnalyzerPort (Gemini)
-  - BenfordApplicabilityService -> decide si Benford aplica por artifact
+La tarea Celery `process_analysis_job` es un adaptador de entrada delgado:
+construye el caso de uso y lo ejecuta con asyncio.run (el pipeline es async
+para procesar los artifacts de un job en paralelo — T2.M8).
 
-TODO Sprint 3 (Capa 3, consolidación real):
-  - FraudScoringService -> score parcial real por artifact
-  - ConsolidationService -> aplica política worst_case_dominates (T3.M4),
-    reemplazando el mock de más abajo.
-
-Ver docs/deepforense_mvp_consolidado.md sección 8 y docs/BACKLOG.md.
+TODO Sprint 3 (Capa 3): FraudScoringService + ConsolidationService con la
+política worst_case_dominates (FOR-112/T3.M4) reemplazan el consolidated
+placeholder del use case.
 """
+import asyncio
 import os
-from datetime import datetime, timezone
 
 from celery import Celery
+from minio import Minio
 from pymongo import MongoClient
 
+from app.application.use_cases.process_analysis_job_use_case import ProcessAnalysisJobUseCase
+from app.domain.services.benford_applicability_service import BenfordApplicabilityService
+from app.infrastructure.adapter.output.benford_statistical_adapter import BenfordStatisticalAdapter
+from app.infrastructure.adapter.output.deepseek_analyzer_adapter import DeepSeekAnalyzerAdapter
+from app.infrastructure.adapter.output.deepseek_ocr_adapter import DeepSeekOcrAdapter
+from app.infrastructure.adapter.output.gemini_vision_analyzer_adapter import (
+    GeminiVisionAnalyzerAdapter,
+)
+from app.infrastructure.adapter.output.minio_storage_adapter import MinioStorageAdapter
+from app.infrastructure.adapter.output.mongo_analysis_job_repository import (
+    MongoAnalysisJobRepository,
+)
+from app.infrastructure.adapter.output.opencv_dct_adapter import OpenCvDctAdapter
+from app.infrastructure.adapter.output.opencv_ela_adapter import OpenCvElaAdapter
+from app.infrastructure.adapter.output.pillow_exif_adapter import PillowExifAdapter
+
+# --- Configuración desde entorno (ver docker-compose.yml / .env.example) ----
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB", "deepforense_forensic")
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "deepforense")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "changeme123")
+MINIO_BUCKET = os.getenv("MINIO_BUCKET", "deepforense-artifacts")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_OCR_DEEPINFRA_API_KEY = os.getenv("DEEPSEEK_OCR_DEEPINFRA_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+BENFORD_MIN_AMOUNT_COUNT = int(os.getenv("BENFORD_MIN_AMOUNT_COUNT", "15"))
 
 celery_app = Celery(
     "forensic_worker",
@@ -43,58 +66,38 @@ celery_app.conf.update(
     enable_utc=True,
 )
 
+# Clientes de infraestructura compartidos entre tareas (conexiones pooled).
 _mongo_client = MongoClient(MONGO_URI)
 _jobs_collection = _mongo_client[MONGO_DB_NAME]["analysis_jobs"]
+_minio_client = Minio(
+    MINIO_ENDPOINT,
+    access_key=MINIO_ACCESS_KEY,
+    secret_key=MINIO_SECRET_KEY,
+    secure=False,
+)
 
-# Fraud score mock fijo (Sprint 1). A partir de Sprint 2/3 esto lo calcula
-# FraudScoringService + ConsolidationService con datos reales.
-_MOCK_FRAUD_SCORE = 0.35
-_MOCK_VERDICT_THRESHOLDS = {"approved_below": 0.4, "rejected_above": 0.7}
 
-
-def _mock_verdict(fraud_score: float) -> str:
-    if fraud_score < _MOCK_VERDICT_THRESHOLDS["approved_below"]:
-        return "APPROVED"
-    if fraud_score > _MOCK_VERDICT_THRESHOLDS["rejected_above"]:
-        return "REJECTED"
-    return "SUSPICIOUS"
+def build_process_job_use_case() -> ProcessAnalysisJobUseCase:
+    """Se construye por invocación: los adaptadores HTTP async no deben
+    compartirse entre event loops distintos (cada tarea corre su asyncio.run)."""
+    return ProcessAnalysisJobUseCase(
+        repository=MongoAnalysisJobRepository(_jobs_collection),
+        storage=MinioStorageAdapter(_minio_client, bucket=MINIO_BUCKET),
+        exif_analyzer=PillowExifAdapter(),
+        ela_analyzer=OpenCvElaAdapter(),
+        dct_analyzer=OpenCvDctAdapter(),
+        benford_analyzer=BenfordStatisticalAdapter(),
+        ocr=DeepSeekOcrAdapter(api_key=DEEPSEEK_OCR_DEEPINFRA_API_KEY),
+        text_analyzer=DeepSeekAnalyzerAdapter(api_key=DEEPSEEK_API_KEY),
+        image_analyzer=GeminiVisionAnalyzerAdapter(api_key=GEMINI_API_KEY),
+        benford_applicability=BenfordApplicabilityService(
+            min_amount_count=BENFORD_MIN_AMOUNT_COUNT
+        ),
+    )
 
 
 @celery_app.task(name="process_analysis_job")
 def process_analysis_job(job_id: str) -> dict:
     """Punto de entrada de la Capa 2/3 para un job ya creado por forensic-api."""
-    job_doc = _jobs_collection.find_one({"_id": job_id})
-    if job_doc is None:
-        return {"job_id": job_id, "status": "JOB_NOT_FOUND"}
-
-    if job_doc["status"] not in ("PENDING", "PROCESSING"):
-        # Ya procesado (idempotencia ante reintentos de Celery).
-        return {"job_id": job_id, "status": job_doc["status"]}
-
-    artifacts = job_doc.get("artifacts", [])
-    for artifact in artifacts:
-        artifact["status"] = "COMPLETED"  # mock: Sprint 2 marcará FAILED si el pipeline real falla
-
-    fraud_score = _MOCK_FRAUD_SCORE
-    consolidated = {
-        "fraud_score": fraud_score,
-        "authenticity_percentage": round((1 - fraud_score) * 100),
-        "risk_percentage": round(fraud_score * 100),
-        "verdict": _mock_verdict(fraud_score),
-        "dominant_artifact": artifacts[0]["artifact_id"] if artifacts else None,
-        "policy_applied": "mock_fixed_score",  # T3.M4 reemplaza por "worst_case_dominates"
-    }
-
-    _jobs_collection.update_one(
-        {"_id": job_id},
-        {
-            "$set": {
-                "status": "COMPLETED",
-                "artifacts": artifacts,
-                "consolidated": consolidated,
-                "completed_at": datetime.now(timezone.utc),
-            }
-        },
-    )
-
-    return {"job_id": job_id, "status": "COMPLETED", "consolidated": consolidated}
+    use_case = build_process_job_use_case()
+    return asyncio.run(use_case.execute(job_id))
