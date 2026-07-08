@@ -1,0 +1,16 @@
+# DeepForense — Override de producción (instancia EC2 de "main").
+# Se usa explícitamente, nunca se autocarga:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# No agrega nada de docker-compose.override.yml (puertos de BD, Kong Admin,
+# Swagger UI, servidor de dev) — solo lo que main necesita distinto del base.
+
+services:
+
+  frontend:
+    build:
+      target: prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    ports:
+      - "80:8080"

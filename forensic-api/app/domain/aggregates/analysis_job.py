@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
-from app.domain.entities.artifact import Artifact
 from app.domain.events.analysis_job_created import AnalysisJobCreated
 from app.domain.events.analysis_job_status_changed import AnalysisJobStatusChanged
 from app.domain.exceptions import EmptyJobError, InvalidJobTransitionError

@@ -1,0 +1,84 @@
+name: CD
+
+# Solo corre al mergear a main. El rol OIDC (ver iam trust policy) solo puede
+# ser asumido por un job que use el Environment "production" de este repo:
+# repo:Deep-Forense/Deep-Forense:environment:production
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-push-deploy:
+    name: Build, push a ECR y desplegar en main
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS (OIDC, sin llaves guardadas)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::867753639028:role/deepforense-github-actions-cd
+          aws-region: sa-east-1
+
+      - name: Login a ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build de las imagenes (targets de produccion)
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+      - name: Tag y push a ECR (tag = commit SHA, los repos son immutable)
+        # Se referencia el nombre fijo "deepforense-<servicio>:latest" en vez
+        # de "docker compose images -q" -- ese comando devolvia vacio en el
+        # runner de GitHub Actions (se comporta distinto que en local), lo que
+        # rompia el docker tag con una referencia vacia.
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          set -euo pipefail
+          for svc in auth-service forensic-api forensic-worker frontend; do
+            docker tag "deepforense-$svc:latest" "$REGISTRY/deepforense/$svc:${{ github.sha }}"
+            docker push "$REGISTRY/deepforense/$svc:${{ github.sha }}"
+          done
+
+      # La instancia (AWS Academy) no tiene permisos IAM para hacer `docker pull`
+      # de ECR -- por diseno (Academy restringe IAM de forma agresiva). En vez de
+      # eso, se transfiere la imagen ya construida directo por SSH.
+      - name: Preparar llave SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.MAIN_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.MAIN_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Transferir imagenes a la instancia (docker save | ssh | docker load)
+        # El "name: deepforense" fijo en docker-compose.yml asegura que la imagen
+        # se llame igual aca y en la instancia (deepforense-<servicio>:latest),
+        # asi "docker load" ya la deja lista con el nombre que docker compose
+        # up espera, sin necesidad de re-etiquetarla en el destino.
+        run: |
+          set -euo pipefail
+          for svc in auth-service forensic-api forensic-worker frontend; do
+            docker save "deepforense-$svc:latest" | gzip | ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.MAIN_HOST }} \
+              "gunzip | docker load"
+          done
+
+      - name: Copiar archivos de despliegue
+        run: |
+          scp -i ~/.ssh/deploy_key docker-compose.yml docker-compose.prod.yml ubuntu@${{ secrets.MAIN_HOST }}:/opt/deepforense/
+          scp -i ~/.ssh/deploy_key -r kong ubuntu@${{ secrets.MAIN_HOST }}:/opt/deepforense/
+
+      - name: Levantar los servicios en main
+        run: |
+          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.MAIN_HOST }} '
+            cd /opt/deepforense &&
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d &&
+            docker image prune -f
+          '
