@@ -30,6 +30,8 @@ class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
                     "type": str(a.type),
                     "storage_ref": a.storage_ref,
                     "status": a.status,
+                    "origin": a.origin,
+                    "analysis": a.analysis,
                 }
                 for a in job.artifacts
             ],
@@ -48,6 +50,9 @@ class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
                 type=ArtifactType(a["type"]),
                 storage_ref=a["storage_ref"],
                 status=a["status"],
+                # Documentos previos a FOR-98 no traen origin/analysis.
+                origin=a.get("origin", "UPLOAD"),
+                analysis=a.get("analysis"),
             )
             for a in doc["artifacts"]
         ]
