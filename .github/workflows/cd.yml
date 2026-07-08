@@ -1,7 +1,8 @@
 name: CD
 
 # Solo corre al mergear a main. El rol OIDC (ver iam trust policy) solo puede
-# ser asumido desde este mismo trigger: repo:Deep-Forense/Deep-Forense:ref:refs/heads/main
+# ser asumido por un job que use el Environment "production" de este repo:
+# repo:Deep-Forense/Deep-Forense:environment:production
 on:
   push:
     branches: [main]
@@ -34,13 +35,16 @@ jobs:
         run: docker compose -f docker-compose.yml -f docker-compose.prod.yml build
 
       - name: Tag y push a ECR (tag = commit SHA, los repos son immutable)
+        # Se referencia el nombre fijo "deepforense-<servicio>:latest" en vez
+        # de "docker compose images -q" -- ese comando devolvia vacio en el
+        # runner de GitHub Actions (se comporta distinto que en local), lo que
+        # rompia el docker tag con una referencia vacia.
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           set -euo pipefail
           for svc in auth-service forensic-api forensic-worker frontend; do
-            image_id=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml images -q "$svc")
-            docker tag "$image_id" "$REGISTRY/deepforense/$svc:${{ github.sha }}"
+            docker tag "deepforense-$svc:latest" "$REGISTRY/deepforense/$svc:${{ github.sha }}"
             docker push "$REGISTRY/deepforense/$svc:${{ github.sha }}"
           done
 
