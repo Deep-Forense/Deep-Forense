@@ -8,8 +8,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.application.dto.submit_analysis_command import SubmitAnalysisCommand
+from app.application.dto.submit_url_analysis_command import SubmitUrlAnalysisCommand
 from app.application.ports.get_job_input_port import GetJobInputPort
 from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
+from app.application.ports.submit_url_analysis_input_port import SubmitUrlAnalysisInputPort
+from app.domain.exceptions import UnsupportedUrlContentError, UrlDownloadError
 
 router = APIRouter(prefix="/api/forensic")
 
@@ -22,12 +25,13 @@ def _resolve_artifact_type(file: Optional[UploadFile]) -> str:
     return "TEXT"
 
 
-@router.post("/demo/analyze", status_code=202)
-async def demo_analyze(
-    file: Optional[UploadFile] = File(default=None),
-    url: Optional[str] = Form(default=None),
-    use_case: SubmitAnalysisInputPort = Depends(),
-):
+async def _submit(
+    user_id: Optional[str],
+    file: Optional[UploadFile],
+    url: Optional[str],
+    file_use_case: SubmitAnalysisInputPort,
+    url_use_case: SubmitUrlAnalysisInputPort,
+) -> dict:
     if (file is None) == (url is None):
         raise HTTPException(
             status_code=400,
@@ -35,19 +39,33 @@ async def demo_analyze(
         )
 
     if url is not None:
-        # T3.M1/T3.M3 (Sprint 3): scraping vía Scrapfly + ArtifactSelectionService.
-        # Sprint 1 no implementa scraping todavía.
-        raise HTTPException(status_code=400, detail="Análisis por URL disponible a partir de Sprint 3.")
+        # FOR-97 (HU3.2): URL directa a imagen/PDF. El caso HTML (scraping
+        # vía Scrapfly + ArtifactSelectionService) es Sprint 3 (FOR-98/T3.M1).
+        try:
+            job_id = await url_use_case.execute(SubmitUrlAnalysisCommand(user_id=user_id, url=url))
+        except (UnsupportedUrlContentError, UrlDownloadError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"job_id": job_id, "status": "PENDING", "artifacts_count": 1}
 
     content = await file.read()
     command = SubmitAnalysisCommand(
-        user_id=None,
+        user_id=user_id,
         file_bytes=content,
         file_name=file.filename,
         artifact_type=_resolve_artifact_type(file),
     )
-    job_id = await use_case.execute(command)
+    job_id = await file_use_case.execute(command)
     return {"job_id": job_id, "status": "PENDING", "artifacts_count": 1}
+
+
+@router.post("/demo/analyze", status_code=202)
+async def demo_analyze(
+    file: Optional[UploadFile] = File(default=None),
+    url: Optional[str] = Form(default=None),
+    use_case: SubmitAnalysisInputPort = Depends(),
+    url_use_case: SubmitUrlAnalysisInputPort = Depends(),
+):
+    return await _submit(None, file, url, use_case, url_use_case)
 
 
 @router.post("/analyze", status_code=202)
@@ -55,21 +73,12 @@ async def analyze(
     file: Optional[UploadFile] = File(default=None),
     url: Optional[str] = Form(default=None),
     use_case: SubmitAnalysisInputPort = Depends(),
+    url_use_case: SubmitUrlAnalysisInputPort = Depends(),
 ):
     """Igual que /demo/analyze pero requiere JWT (T1.P3 valida el token en Kong/
     middleware; aquí se asumiría el user_id ya resuelto del token)."""
-    if (file is None) == (url is None):
-        raise HTTPException(status_code=400, detail="Debe proveerse 'file' o 'url', no ambos ni ninguno.")
-
-    content = await file.read()
-    command = SubmitAnalysisCommand(
-        user_id=None,  # TODO Sprint 1: extraer del JWT validado
-        file_bytes=content,
-        file_name=file.filename,
-        artifact_type=_resolve_artifact_type(file),
-    )
-    job_id = await use_case.execute(command)
-    return {"job_id": job_id, "status": "PENDING", "artifacts_count": 1}
+    # TODO Sprint 1: extraer user_id del JWT validado
+    return await _submit(None, file, url, use_case, url_use_case)
 
 
 @router.get("/jobs/{job_id}")

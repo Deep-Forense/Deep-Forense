@@ -13,10 +13,13 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.application.ports.get_job_input_port import GetJobInputPort
 from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
+from app.application.ports.submit_url_analysis_input_port import SubmitUrlAnalysisInputPort
 from app.application.use_cases.get_job_use_case import GetJobUseCase
 from app.application.use_cases.submit_analysis_use_case import SubmitAnalysisUseCase
+from app.application.use_cases.submit_url_analysis_use_case import SubmitUrlAnalysisUseCase
 from app.infrastructure.adapter.input.rest.analysis_controller import router as analysis_router
 from app.infrastructure.adapter.output.celery_task_queue_adapter import CeleryTaskQueueAdapter
+from app.infrastructure.adapter.output.httpx_url_downloader_adapter import HttpxUrlDownloaderAdapter
 from app.infrastructure.adapter.output.minio_storage_adapter import MinioStorageAdapter
 from app.infrastructure.adapter.output.mongo_analysis_job_repository import MongoAnalysisJobRepository
 
@@ -52,6 +55,10 @@ task_queue = CeleryTaskQueueAdapter(celery_client)
 
 # --- Casos de uso (application) --------------------------------------------
 submit_analysis_use_case = SubmitAnalysisUseCase(repository=repository, storage=storage, task_queue=task_queue)
+url_downloader = HttpxUrlDownloaderAdapter()
+submit_url_analysis_use_case = SubmitUrlAnalysisUseCase(
+    repository=repository, storage=storage, task_queue=task_queue, downloader=url_downloader
+)
 get_job_use_case = GetJobUseCase(repository=repository)
 
 # --- FastAPI app + wiring de dependencias -----------------------------------
@@ -63,6 +70,7 @@ app = FastAPI(
 )
 
 app.dependency_overrides[SubmitAnalysisInputPort] = lambda: submit_analysis_use_case
+app.dependency_overrides[SubmitUrlAnalysisInputPort] = lambda: submit_url_analysis_use_case
 app.dependency_overrides[GetJobInputPort] = lambda: get_job_use_case
 
 app.include_router(analysis_router)
