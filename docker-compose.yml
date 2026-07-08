@@ -3,6 +3,14 @@
 # docker-compose.override.yml (autocargado en local) para no repetirlo en
 # docker-compose.prod.yml. Ver README.md para los comandos de cada entorno.
 
+# Nombre de proyecto fijo: sin esto, Docker Compose deriva el nombre de las
+# imagenes (ej. "deepforense-auth-service") del nombre de la carpeta donde
+# corre. Como el checkout de GitHub Actions y la carpeta en la instancia de
+# main tienen nombres distintos al de esta carpeta local, el CD (build en el
+# runner, docker load en la instancia) necesita que el nombre sea siempre el
+# mismo sin importar dónde se ejecute.
+name: deepforense
+
 services:
 
   # ------------------------------------------------------------------
