@@ -64,6 +64,7 @@ plugins:
     config:
       origins:
         - "http://localhost:5173"
+        - "http://32.198.156.63"
       methods:
         - GET
         - POST
