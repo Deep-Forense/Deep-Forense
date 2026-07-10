@@ -12,9 +12,11 @@ from minio import Minio
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.application.ports.get_job_input_port import GetJobInputPort
+from app.application.ports.list_jobs_input_port import ListJobsInputPort
 from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
 from app.application.ports.submit_url_analysis_input_port import SubmitUrlAnalysisInputPort
 from app.application.use_cases.get_job_use_case import GetJobUseCase
+from app.application.use_cases.list_jobs_use_case import ListJobsUseCase
 from app.application.use_cases.submit_analysis_use_case import SubmitAnalysisUseCase
 from app.application.use_cases.submit_url_analysis_use_case import SubmitUrlAnalysisUseCase
 from app.domain.services.artifact_selection_service import ArtifactSelectionService
@@ -71,6 +73,7 @@ submit_url_analysis_use_case = SubmitUrlAnalysisUseCase(
     artifact_selection=ArtifactSelectionService(max_candidates=MAX_IMAGES_PER_JOB),
 )
 get_job_use_case = GetJobUseCase(repository=repository)
+list_jobs_use_case = ListJobsUseCase(repository=repository)
 
 # --- FastAPI app + wiring de dependencias -----------------------------------
 app = FastAPI(
@@ -83,6 +86,14 @@ app = FastAPI(
 app.dependency_overrides[SubmitAnalysisInputPort] = lambda: submit_analysis_use_case
 app.dependency_overrides[SubmitUrlAnalysisInputPort] = lambda: submit_url_analysis_use_case
 app.dependency_overrides[GetJobInputPort] = lambda: get_job_use_case
+app.dependency_overrides[ListJobsInputPort] = lambda: list_jobs_use_case
+
+
+@app.on_event("startup")
+async def ensure_mongo_indexes():
+    # FOR-100: índice {user_id: 1, created_at: -1} para el historial paginado.
+    # Idempotente: en un redeploy con el índice ya creado no hace nada.
+    await repository.ensure_indexes()
 
 app.include_router(analysis_router)
 
