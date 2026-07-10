@@ -4,6 +4,12 @@
 (el mismo que escribe forensic-api). pymongo es síncrono: las operaciones
 son actualizaciones puntuales y rápidas, se ejecutan en un thread para no
 bloquear el event loop del pipeline (asyncio.to_thread).
+
+RF-28: las transiciones reales de estado que ejecuta el worker
+(PENDING->PROCESSING y el cierre COMPLETED/FAILED) se registran con $push en
+el array embebido `events` del documento ({"type": "JOB_<ESTADO>",
+"timestamp": ...}, esquema de docs/deepforense_mvp_consolidado.md sección
+6.2). El evento JOB_CREATED lo siembra forensic-api al crear el documento.
 """
 import asyncio
 from datetime import datetime, timezone
@@ -43,10 +49,21 @@ class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
         ]
 
     async def mark_processing(self, job_id: str) -> None:
+        # El filtro por status PENDING hace la transición (y su evento)
+        # idempotente ante reintentos de Celery: si ya está PROCESSING el
+        # update no matchea y no se duplica el evento.
         await asyncio.to_thread(
             self._collection.update_one,
             {"_id": job_id, "status": "PENDING"},
-            {"$set": {"status": "PROCESSING"}},
+            {
+                "$set": {"status": "PROCESSING"},
+                "$push": {
+                    "events": {
+                        "type": "JOB_PROCESSING",
+                        "timestamp": datetime.now(timezone.utc),
+                    }
+                },
+            },
         )
 
     async def save_artifact_result(
@@ -62,6 +79,7 @@ class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
         )
 
     async def complete_job(self, job_id: str, status: str, consolidated: Optional[dict]) -> None:
+        now = datetime.now(timezone.utc)
         await asyncio.to_thread(
             self._collection.update_one,
             {"_id": job_id},
@@ -69,7 +87,9 @@ class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
                 "$set": {
                     "status": status,
                     "consolidated": consolidated,
-                    "completed_at": datetime.now(timezone.utc),
-                }
+                    "completed_at": now,
+                },
+                # RF-28: JOB_COMPLETED o JOB_FAILED según el cierre real.
+                "$push": {"events": {"type": f"JOB_{status}", "timestamp": now}},
             },
         )
