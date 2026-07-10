@@ -5,11 +5,12 @@ solo valida forma de entrada y delega en los casos de uso inyectados.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from app.application.dto.submit_analysis_command import SubmitAnalysisCommand
 from app.application.dto.submit_url_analysis_command import SubmitUrlAnalysisCommand
 from app.application.ports.get_job_input_port import GetJobInputPort
+from app.application.ports.list_jobs_input_port import ListJobsInputPort
 from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
 from app.application.ports.submit_url_analysis_input_port import SubmitUrlAnalysisInputPort
 from app.domain.exceptions import UnsupportedUrlContentError, UrlDownloadError
@@ -97,6 +98,44 @@ def _artifact_view(artifact, full: bool) -> dict:
         view["origin"] = artifact.origin
         view["analysis"] = artifact.analysis
     return view
+
+
+def _job_summary(job) -> dict:
+    """Vista JobSummary del contrato (docs/openapi.yaml). input_source se
+    deriva del origin de los artifacts: SCRAPED_* => URL; en otro caso UPLOAD
+    (limitación conocida: una URL directa a imagen/PDF de FOR-97 crea
+    artifacts origin=UPLOAD y se reporta como UPLOAD)."""
+    consolidated = job.consolidated or {}
+    scraped = any(a.origin.startswith("SCRAPED") for a in job.artifacts)
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "verdict": consolidated.get("verdict"),
+        "fraud_score": consolidated.get("fraud_score"),
+        "input_source": "URL" if scraped else "UPLOAD",
+        "created_at": job.created_at,
+    }
+
+
+@router.get("/jobs")
+async def list_jobs(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    verdict: Optional[str] = Query(default=None, pattern="^(APPROVED|SUSPICIOUS|REJECTED)$"),
+    use_case: ListJobsInputPort = Depends(),
+    user_id: str = Depends(require_user_id),
+):
+    """FOR-100/RF-29: historial paginado del usuario autenticado (JWT
+    obligatorio; jamás lista jobs de otros usuarios ni jobs demo)."""
+    jobs_page = await use_case.execute(
+        user_id=user_id, page=page, page_size=page_size, verdict=verdict
+    )
+    return {
+        "page": jobs_page.page,
+        "page_size": jobs_page.page_size,
+        "total": jobs_page.total,
+        "items": [_job_summary(job) for job in jobs_page.items],
+    }
 
 
 @router.get("/jobs/{job_id}")
