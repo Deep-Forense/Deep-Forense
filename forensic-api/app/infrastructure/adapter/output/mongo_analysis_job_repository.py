@@ -45,9 +45,21 @@ def _to_aggregate(doc: dict) -> AnalysisJob:
     )
 
 
+# Índice compuesto para find_by_user (FOR-100): filtro por user_id + orden
+# por created_at descendente. Sin él, cada GET /jobs es un collection scan.
+USER_HISTORY_INDEX = [("user_id", 1), ("created_at", -1)]
+
+
 class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
     def __init__(self, collection: AsyncIOMotorCollection) -> None:
         self._collection = collection
+
+    async def ensure_indexes(self) -> None:
+        """Crea los índices de la colección. Idempotente por diseño de Mongo:
+        si el índice ya existe con las mismas keys (p.ej. en un redeploy),
+        create_index no hace nada y no lanza. Se invoca desde el startup de
+        FastAPI (main.py)."""
+        await self._collection.create_index(USER_HISTORY_INDEX)
 
     async def save(self, job: AnalysisJob) -> None:
         document = {

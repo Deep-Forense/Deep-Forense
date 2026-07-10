@@ -88,6 +88,13 @@ app.dependency_overrides[SubmitUrlAnalysisInputPort] = lambda: submit_url_analys
 app.dependency_overrides[GetJobInputPort] = lambda: get_job_use_case
 app.dependency_overrides[ListJobsInputPort] = lambda: list_jobs_use_case
 
+
+@app.on_event("startup")
+async def ensure_mongo_indexes():
+    # FOR-100: índice {user_id: 1, created_at: -1} para el historial paginado.
+    # Idempotente: en un redeploy con el índice ya creado no hace nada.
+    await repository.ensure_indexes()
+
 app.include_router(analysis_router)
 
 
