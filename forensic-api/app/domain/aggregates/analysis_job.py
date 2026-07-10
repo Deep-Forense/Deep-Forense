@@ -30,6 +30,10 @@ class AnalysisJob:
     consolidated: Optional[dict] = field(default=None)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = field(default=None)
+    # RF-28: historial de transiciones PERSISTIDO en el documento Mongo
+    # ({"type": "JOB_<ESTADO>", "timestamp": ...}). Distinto de _domain_events
+    # (eventos de dominio en memoria, para publicar vía pull_domain_events()).
+    events: list = field(default_factory=list)
     _domain_events: list = field(default_factory=list, repr=False)
 
     @staticmethod

@@ -72,6 +72,9 @@ class FakeRepository(AnalysisJobRepositoryPort):
     async def find_by_id(self, job_id: str):
         return None
 
+    async def find_by_user(self, user_id, page, page_size, verdict=None):
+        return [], 0
+
 
 class FakeQueue(TaskQueuePort):
     def __init__(self) -> None:
