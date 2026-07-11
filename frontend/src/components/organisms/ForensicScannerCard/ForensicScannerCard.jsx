@@ -11,7 +11,7 @@ import { UrlAnalyzeBox } from "@/components/molecules/UrlAnalyzeBox";
 import { StatCard } from "@/components/molecules/StatCard";
 import { getApiErrorMessage } from "@/utils/apiError";
 
-export default function ForensicScannerCard({ authenticated = false }) {
+export default function ForensicScannerCard({ authenticated = false, onAnalysisCompleted }) {
   const [activeMode, setActiveMode] = useState("document");
   const [selectedFile, setSelectedFile] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -32,6 +32,7 @@ export default function ForensicScannerCard({ authenticated = false }) {
     try {
       const result = await submitAndWaitForScan({ file: selectedFile, mode: activeMode, authenticated });
       setScanResult(result);
+      onAnalysisCompleted?.(result);
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, requestError.message || "No fue posible analizar el archivo."));
     } finally {
@@ -47,7 +48,9 @@ export default function ForensicScannerCard({ authenticated = false }) {
 
     try {
       const created = await scanUrl(url, authenticated);
-      setScanResult(await waitForScanResult(created.job_id));
+      const result = await waitForScanResult(created.job_id);
+      setScanResult(result);
+      onAnalysisCompleted?.(result);
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, "El backend todavía no admite análisis por URL."));
     } finally {

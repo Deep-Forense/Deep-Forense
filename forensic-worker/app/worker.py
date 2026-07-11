@@ -52,6 +52,7 @@ MINIO_BUCKET = os.getenv("MINIO_BUCKET", "deepforense-artifacts")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_OCR_DEEPINFRA_API_KEY = os.getenv("DEEPSEEK_OCR_DEEPINFRA_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 BENFORD_MIN_AMOUNT_COUNT = int(os.getenv("BENFORD_MIN_AMOUNT_COUNT", "15"))
 CONSOLIDATION_POLICY = os.getenv("CONSOLIDATION_POLICY", "worst_case_dominates")
 
@@ -92,7 +93,10 @@ def build_process_job_use_case() -> ProcessAnalysisJobUseCase:
         benford_analyzer=BenfordStatisticalAdapter(),
         ocr=DeepSeekOcrAdapter(api_key=DEEPSEEK_OCR_DEEPINFRA_API_KEY),
         text_analyzer=DeepSeekAnalyzerAdapter(api_key=DEEPSEEK_API_KEY),
-        image_analyzer=GeminiVisionAnalyzerAdapter(api_key=GEMINI_API_KEY),
+        image_analyzer=GeminiVisionAnalyzerAdapter(
+            api_key=GEMINI_API_KEY,
+            model=GEMINI_MODEL,
+        ),
         benford_applicability=BenfordApplicabilityService(
             min_amount_count=BENFORD_MIN_AMOUNT_COUNT
         ),

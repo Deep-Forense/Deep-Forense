@@ -14,7 +14,7 @@ const verdictConfig = {
   FAILED: { label: "Fallido", variant: "danger" },
 };
 
-export default function ScanHistoryTable({ jobs }) {
+export default function ScanHistoryTable({ jobs, loading = false, error = "", onRetry }) {
   return (
     <section className="overflow-hidden rounded-3xl border border-border-soft bg-white shadow-lg shadow-secondary/5">
       <div className="flex flex-col gap-2 border-b border-border-soft bg-slate-50/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -24,7 +24,7 @@ export default function ScanHistoryTable({ jobs }) {
           </h2>
           <p className="mt-1 text-xs text-text-soft">Historial de trabajos forenses asociados a tu cuenta.</p>
         </div>
-        <button type="button" className="text-xs font-bold text-primary hover:underline">Ver historial completo</button>
+        <button type="button" onClick={onRetry} className="text-xs font-bold text-primary hover:underline">Actualizar</button>
       </div>
 
       <div className="overflow-x-auto">
@@ -41,8 +41,15 @@ export default function ScanHistoryTable({ jobs }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border-soft">
+            {(loading || error || jobs.length === 0) && (
+              <tr>
+                <td colSpan="7" className="px-5 py-8 text-center text-sm text-text-soft">
+                  {loading ? "Cargando historial..." : error || "Todavía no tienes análisis registrados."}
+                </td>
+              </tr>
+            )}
             {jobs.map((job) => {
-              const verdict = verdictConfig[job.verdict];
+              const verdict = verdictConfig[job.verdict] || verdictConfig.PENDING;
               return (
                 <tr key={job.jobId} className="transition hover:bg-tertiary/30">
                   <td className="px-5 py-4">
