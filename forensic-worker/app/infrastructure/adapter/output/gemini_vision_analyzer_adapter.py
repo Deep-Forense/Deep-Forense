@@ -11,7 +11,8 @@ import httpx
 from app.domain.ports.image_cognitive_analyzer_port import ImageCognitiveAnalyzerPort
 
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-_MODEL = "gemini-2.0-flash"
+# gemini-2.0-flash fue retirado el 1 de junio de 2026.
+_MODEL = "gemini-3.5-flash"
 _TIMEOUT_SECONDS = 90.0
 
 _PROMPT = """Eres un analista forense de imágenes. Examina la imagen buscando señales de manipulación o generación artificial: bordes incoherentes, iluminación/sombras inconsistentes, texto deformado, patrones repetidos de clonación, artefactos de IA generativa (manos, texturas), metadatos visuales incongruentes.

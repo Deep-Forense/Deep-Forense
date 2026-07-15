@@ -36,7 +36,7 @@ async def test_returns_flags_from_gemini():
     assert flags == ["cloned_region", "warped_text"]
     request = captured[0]
     assert request.headers["x-goog-api-key"] == "gm-key"
-    assert "gemini-2.0-flash:generateContent" in str(request.url)
+    assert "gemini-3.5-flash:generateContent" in str(request.url)
     body = json.loads(request.content)
     assert body["contents"][0]["parts"][0]["inline_data"]["mime_type"] == "image/jpeg"
 

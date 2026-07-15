@@ -1,4 +1,4 @@
-import { analyzeDemo, analyzeAuthenticated, getJob } from "@/api/client";
+import { analyzeDemo, analyzeAuthenticated, getJob, listJobs } from "@/api/client";
 
 export const scanDemoFile = async (file, mode) => {
   const formData = new FormData();
@@ -75,4 +75,30 @@ export const submitAndWaitForScan = async ({ file, mode, authenticated }) => {
     ? await scanAuthenticatedFile(file, mode)
     : await scanDemoFile(file, mode);
   return waitForScanResult(created.job_id);
+};
+
+export const getScanHistory = async ({ page = 1, pageSize = 20, verdict } = {}) => {
+  const params = { page, page_size: pageSize };
+  if (verdict) params.verdict = verdict;
+
+  const { data } = await listJobs(params);
+  return {
+    ...data,
+    items: data.items.map((job) => {
+      const riskPercentage = job.fraud_score == null ? null : Math.round(job.fraud_score * 100);
+      return {
+        jobId: job.job_id,
+        fileName: job.input_source === "URL" ? "Contenido desde URL" : "Archivo cargado",
+        artifactType: job.input_source === "URL" ? "URL" : "UPLOAD",
+        status: job.status,
+        riskPercentage,
+        authenticityPercentage: riskPercentage == null ? null : 100 - riskPercentage,
+        verdict: job.verdict || (job.status === "FAILED" ? "FAILED" : "PENDING"),
+        createdAt: new Intl.DateTimeFormat("es-EC", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(job.created_at)),
+      };
+    }),
+  };
 };
