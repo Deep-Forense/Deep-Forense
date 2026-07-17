@@ -15,8 +15,13 @@ _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 _MODEL = "gemini-3.5-flash"
 _TIMEOUT_SECONDS = 90.0
 
-_PROMPT = """Eres un analista forense de imágenes. Examina la imagen buscando señales de manipulación o generación artificial: bordes incoherentes, iluminación/sombras inconsistentes, texto deformado, patrones repetidos de clonación, artefactos de IA generativa (manos, texturas), metadatos visuales incongruentes.
-Responde SOLO un JSON: {"flags": [<banderas en snake_case, ej. "inconsistent_lighting", "cloned_region", "ai_generation_artifacts", "warped_text". Lista vacía si la imagen parece auténtica>]}"""
+_PROMPT = """Eres un analista forense de imágenes. Clasifica únicamente señales visibles, sin asumir que una imagen es auténtica solo porque se ve realista. Busca:
+- generación completa por IA: ai_generation_artifacts, synthetic_texture, anatomical_inconsistency;
+- modificación localizada por IA: ai_inpainting_artifacts, generative_fill_artifacts;
+- edición convencional: cloned_region, compositing_artifacts, inconsistent_lighting, warped_text;
+- captura de pantalla: screenshot_ui_elements, screen_capture_artifacts.
+Usa exclusivamente esas banderas. Una captura puede tener además señales de edición o IA.
+Responde SOLO un JSON con esta forma: {"flags": ["..."]}. Devuelve una lista vacía únicamente cuando no exista evidencia visual suficiente."""
 
 _IMAGE_MAGICS = (
     (b"\xff\xd8\xff", "image/jpeg"),
@@ -63,7 +68,31 @@ class GeminiVisionAnalyzerAdapter(ImageCognitiveAnalyzerPort):
                     ]
                 }
             ],
-            "generationConfig": {"response_mime_type": "application/json", "temperature": 0.1},
+            "generationConfig": {
+                "response_mime_type": "application/json",
+                "response_schema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "flags": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "STRING",
+                                "enum": [
+                                    "ai_generation_artifacts", "synthetic_texture",
+                                    "anatomical_inconsistency", "ai_inpainting_artifacts",
+                                    "generative_fill_artifacts", "cloned_region",
+                                    "compositing_artifacts", "inconsistent_lighting",
+                                    "warped_text", "screenshot_ui_elements",
+                                    "screen_capture_artifacts"
+                                ]
+                            }
+                        }
+                    },
+                    "required": ["flags"]
+                },
+                "temperature": 0.0,
+                "seed": 42
+            },
         }
         headers = {"x-goog-api-key": self._api_key}
 

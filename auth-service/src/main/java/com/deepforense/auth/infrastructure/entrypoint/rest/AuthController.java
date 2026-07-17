@@ -43,6 +43,8 @@ public class AuthController {
             return ResponseEntity.status(201).body(Map.of("id", userId, "email", request.email()));
         } catch (DuplicateEmailException e) {
             return ResponseEntity.status(409).body(Map.of("error_code", "EMAIL_ALREADY_REGISTERED", "message", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error_code", "INVALID_REGISTRATION_DATA", "message", e.getMessage()));
         }
     }
 

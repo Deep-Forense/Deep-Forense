@@ -24,6 +24,7 @@ from app.domain.ports.text_cognitive_analyzer_port import (
 from app.domain.services.benford_applicability_service import BenfordApplicabilityService
 from app.domain.services.consolidation_service import ConsolidationService
 from app.domain.services.fraud_scoring_service import FraudScoringService
+from app.domain.services.image_classification_service import ImageClassificationService
 
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
@@ -125,6 +126,7 @@ def _use_case(repository, storage, ela=None, text_analyzer=None) -> ProcessAnaly
         benford_applicability=BenfordApplicabilityService(min_amount_count=15),
         fraud_scoring=FraudScoringService(),
         consolidation=ConsolidationService(),  # worst_case_dominates default
+        image_classification=ImageClassificationService(),
     )
 
 

@@ -37,6 +37,7 @@ from app.domain.ports.text_cognitive_analyzer_port import TextCognitiveAnalyzerP
 from app.domain.services.benford_applicability_service import BenfordApplicabilityService
 from app.domain.services.consolidation_service import ConsolidationService, ScoredArtifact
 from app.domain.services.fraud_scoring_service import FraudScoringService
+from app.domain.services.image_classification_service import ImageClassificationService
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class ProcessAnalysisJobUseCase:
         benford_applicability: BenfordApplicabilityService,
         fraud_scoring: FraudScoringService,
         consolidation: ConsolidationService,
+        image_classification: ImageClassificationService,
     ) -> None:
         self._repository = repository
         self._storage = storage
@@ -69,6 +71,7 @@ class ProcessAnalysisJobUseCase:
         self._benford_applicability = benford_applicability
         self._fraud_scoring = fraud_scoring
         self._consolidation = consolidation
+        self._image_classification = image_classification
 
     async def execute(self, job_id: str) -> dict:
         status = await self._repository.get_job_status(job_id)
@@ -174,6 +177,9 @@ class ProcessAnalysisJobUseCase:
             dct_benford_score = await self._benford_analyzer.score(coefficients)
 
         gemini_flags = await self._image_analyzer.analyze(content)
+        image_classification, classification_message = self._image_classification.classify(
+            gemini_flags, exif_score, ela_result.score
+        )
 
         return ArtifactAnalysis(
             ai_flags=list(gemini_flags),
@@ -182,5 +188,7 @@ class ProcessAnalysisJobUseCase:
             ela_score=ela_result.score,
             dct_benford_score=dct_benford_score,
             gemini_flags=list(gemini_flags),
+            image_classification=image_classification,
+            image_classification_message=classification_message,
         )
 

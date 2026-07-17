@@ -19,6 +19,8 @@ class ArtifactAnalysis:
     ela_score: Optional[float] = None  # solo IMAGE
     dct_benford_score: Optional[float] = None  # solo IMAGE
     gemini_flags: list = field(default_factory=list)  # solo IMAGE
+    image_classification: Optional[str] = None  # solo IMAGE
+    image_classification_message: Optional[str] = None  # solo IMAGE
 
     def to_dict(self) -> dict:
         return {
@@ -31,6 +33,8 @@ class ArtifactAnalysis:
             "ela_score": self.ela_score,
             "dct_benford_score": self.dct_benford_score,
             "gemini_flags": self.gemini_flags,
+            "image_classification": self.image_classification,
+            "image_classification_message": self.image_classification_message,
         }
 
     def numeric_scores(self) -> list:

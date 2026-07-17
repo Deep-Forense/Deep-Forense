@@ -2,17 +2,16 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  FiCheckCircle,
   FiFileText,
   FiImage,
   FiInfo,
   FiLock,
   FiRefreshCw,
 } from "react-icons/fi";
-import { Badge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
 import { AnalysisMetric } from "@/components/molecules/AnalysisMetric";
 import { LockedInsight } from "@/components/molecules/LockedInsight";
+import { VerdictBadge } from "@/features/scan/components/VerdictBadge";
 import { paths } from "@/routes/paths";
 
 const lockedInsights = ["Análisis OCR", "Mapa ELA", "Texto extraído", "Regiones sospechosas"];
@@ -44,9 +43,7 @@ export default function ScanResult({ file, mode, result, onReset }) {
             <p className="truncate text-xs text-text-soft">{file?.name || "Archivo de demostración"}</p>
           </div>
         </div>
-        <Badge variant="success">
-          <FiCheckCircle /> {result.verdict}
-        </Badge>
+        <VerdictBadge verdict={result.verdict} />
       </div>
 
       <div className="grid gap-6 p-5 md:grid-cols-[0.9fr_1.1fr]">
