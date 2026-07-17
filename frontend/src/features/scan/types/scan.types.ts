@@ -11,4 +11,11 @@ export interface ScanResult {
   model: string;
   policyApplied: string;
   summary: string;
+  artifacts: Array<{
+    artifactId: string;
+    type: "TEXT" | "IMAGE";
+    status: "COMPLETED" | "FAILED";
+    analysis: Record<string, unknown> | null;
+  }>;
+  imageAnalysis: Record<string, unknown> | null;
 }

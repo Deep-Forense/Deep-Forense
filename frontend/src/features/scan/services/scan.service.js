@@ -36,6 +36,14 @@ export const normalizeScanResult = (job) => {
   const riskPercentage = consolidated.risk_percentage ?? Math.round((consolidated.fraud_score ?? 0) * 100);
   const authenticityPercentage = consolidated.authenticity_percentage ?? 100 - riskPercentage;
   const verdict = consolidated.verdict || "SUSPICIOUS";
+  const artifacts = (job.artifacts || []).map((artifact) => ({
+    artifactId: artifact.artifact_id,
+    type: artifact.type,
+    origin: artifact.origin,
+    status: artifact.status,
+    analysis: artifact.analysis || null,
+  }));
+  const imageArtifact = artifacts.find((artifact) => artifact.type === "IMAGE" && artifact.analysis);
 
   return {
     jobId: job.job_id,
@@ -51,7 +59,8 @@ export const normalizeScanResult = (job) => {
       verdict === "APPROVED"
         ? "No se detectaron indicadores críticos en el análisis consolidado."
         : "El análisis detectó indicadores que requieren revisión adicional.",
-    artifacts: job.artifacts || [],
+    artifacts,
+    imageAnalysis: imageArtifact?.analysis || null,
     createdAt: job.created_at,
     completedAt: job.completed_at,
   };

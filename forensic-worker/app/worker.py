@@ -27,6 +27,7 @@ from app.application.use_cases.process_analysis_job_use_case import ProcessAnaly
 from app.domain.services.benford_applicability_service import BenfordApplicabilityService
 from app.domain.services.consolidation_service import ConsolidationService
 from app.domain.services.fraud_scoring_service import FraudScoringService
+from app.domain.services.image_classification_service import ImageClassificationService
 from app.infrastructure.adapter.output.benford_statistical_adapter import BenfordStatisticalAdapter
 from app.infrastructure.adapter.output.deepseek_analyzer_adapter import DeepSeekAnalyzerAdapter
 from app.infrastructure.adapter.output.deepseek_ocr_adapter import DeepSeekOcrAdapter
@@ -116,6 +117,7 @@ def build_process_job_use_case() -> ProcessAnalysisJobUseCase:
         ),
         fraud_scoring=FraudScoringService(),
         consolidation=ConsolidationService(policy=CONSOLIDATION_POLICY),
+        image_classification=ImageClassificationService(),
     )
 
 

@@ -342,6 +342,11 @@ components:
             gemini_flags:
               type: array
               items: { type: string }
+            image_classification:
+              type: string
+              nullable: true
+              enum: [AI_GENERATED, AI_MODIFIED, SCREENSHOT, EDITED, AUTHENTIC, INCONCLUSIVE]
+            image_classification_message: { type: string, nullable: true }
 
     JobResult:
       type: object
