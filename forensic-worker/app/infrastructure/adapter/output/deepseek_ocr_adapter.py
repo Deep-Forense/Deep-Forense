@@ -50,10 +50,12 @@ class DeepSeekOcrAdapter(OcrPort):
         api_key: str,
         client: httpx.AsyncClient | None = None,
         base_url: str = _DEEPINFRA_OPENAI_URL,
+        model: str = _MODEL,
     ) -> None:
         self._api_key = api_key
         self._client = client
         self._base_url = base_url
+        self._model = model
 
     async def extract_text(self, content: bytes) -> str:
         if content.startswith(_PDF_MAGIC):
@@ -85,7 +87,7 @@ class DeepSeekOcrAdapter(OcrPort):
     async def _ocr_image(self, image_bytes: bytes, mime: str) -> str:
         data_url = f"data:{mime};base64,{base64.b64encode(image_bytes).decode('ascii')}"
         payload = {
-            "model": _MODEL,
+            "model": self._model,
             "messages": [
                 {
                     "role": "user",
