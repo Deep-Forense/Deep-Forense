@@ -33,14 +33,16 @@ class DeepSeekAnalyzerAdapter(TextCognitiveAnalyzerPort):
         api_key: str,
         client: httpx.AsyncClient | None = None,
         base_url: str = _DEEPSEEK_URL,
+        model: str = _MODEL,
     ) -> None:
         self._api_key = api_key
         self._client = client
         self._base_url = base_url
+        self._model = model
 
     async def analyze(self, text: str) -> TextCognitiveResult:
         payload = {
-            "model": _MODEL,
+            "model": self._model,
             "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": text[:_MAX_TEXT_CHARS]},

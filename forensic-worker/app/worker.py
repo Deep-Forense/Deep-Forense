@@ -50,9 +50,15 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "deepforense")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "changeme123")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "deepforense-artifacts")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL") or "https://api.deepseek.com/chat/completions"
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL") or "deepseek-chat"
 DEEPSEEK_OCR_DEEPINFRA_API_KEY = os.getenv("DEEPSEEK_OCR_DEEPINFRA_API_KEY", "")
+DEEPSEEK_OCR_BASE_URL = (
+    os.getenv("DEEPSEEK_OCR_BASE_URL") or "https://api.deepinfra.com/v1/openai/chat/completions"
+)
+DEEPSEEK_OCR_MODEL = os.getenv("DEEPSEEK_OCR_MODEL") or "deepseek-ai/DeepSeek-OCR"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
 BENFORD_MIN_AMOUNT_COUNT = int(os.getenv("BENFORD_MIN_AMOUNT_COUNT", "15"))
 CONSOLIDATION_POLICY = os.getenv("CONSOLIDATION_POLICY", "worst_case_dominates")
 
@@ -91,8 +97,16 @@ def build_process_job_use_case() -> ProcessAnalysisJobUseCase:
         ela_analyzer=OpenCvElaAdapter(),
         dct_analyzer=OpenCvDctAdapter(),
         benford_analyzer=BenfordStatisticalAdapter(),
-        ocr=DeepSeekOcrAdapter(api_key=DEEPSEEK_OCR_DEEPINFRA_API_KEY),
-        text_analyzer=DeepSeekAnalyzerAdapter(api_key=DEEPSEEK_API_KEY),
+        ocr=DeepSeekOcrAdapter(
+            api_key=DEEPSEEK_OCR_DEEPINFRA_API_KEY,
+            base_url=DEEPSEEK_OCR_BASE_URL,
+            model=DEEPSEEK_OCR_MODEL,
+        ),
+        text_analyzer=DeepSeekAnalyzerAdapter(
+            api_key=DEEPSEEK_API_KEY,
+            base_url=DEEPSEEK_BASE_URL,
+            model=DEEPSEEK_MODEL,
+        ),
         image_analyzer=GeminiVisionAnalyzerAdapter(
             api_key=GEMINI_API_KEY,
             model=GEMINI_MODEL,
