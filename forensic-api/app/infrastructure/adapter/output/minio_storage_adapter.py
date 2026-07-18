@@ -20,6 +20,9 @@ class MinioStorageAdapter(StoragePort):
             self._client.make_bucket(self._bucket)
 
     async def save(self, path: str, content: bytes) -> str:
+        return await asyncio.to_thread(self._save_sync, path, content)
+
+    def _save_sync(self, path: str, content: bytes) -> str:
         self._client.put_object(
             bucket_name=self._bucket,
             object_name=path,
@@ -29,6 +32,9 @@ class MinioStorageAdapter(StoragePort):
         return f"{self._bucket}/{path}"
 
     async def get(self, storage_ref: str) -> bytes:
+        return await asyncio.to_thread(self._get_sync, storage_ref)
+
+    def _get_sync(self, storage_ref: str) -> bytes:
         bucket, _, path = storage_ref.partition("/")
         if not path:
             raise ValueError(f"storage_ref inválido (se espera 'bucket/path'): {storage_ref!r}")

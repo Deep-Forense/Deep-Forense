@@ -5,13 +5,13 @@ import { Badge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
 import { AnalysisMetric } from "@/components/molecules/AnalysisMetric";
 import { HeatmapViewer } from "@/components/molecules/HeatmapViewer";
+import { InfoTip } from "@/components/molecules/InfoTip";
 import { ImageClassificationPanel } from "@/features/scan/components/ImageClassificationPanel";
 import { VerdictBadge } from "@/features/scan/components/VerdictBadge";
 import {
   percentScore,
   VERDICT_PRESENTATION,
 } from "@/features/scan/domain/scanPresentation";
-import { MOCK_ELA_HEATMAP_URL } from "@/features/scan/mocks/dashboard.mock";
 import { fetchElaHeatmapObjectUrl } from "@/features/scan/services/scan.service";
 
 function EvidencePreview({ previewUrl, fileName }) {
@@ -205,10 +205,9 @@ export default function AdvancedScanResult({
           </p>
           <div className="mt-4">
             <HeatmapViewer
-              heatmapUrl={realHeatmapUrl || MOCK_ELA_HEATMAP_URL}
+              heatmapUrl={realHeatmapUrl}
               score={imageAnalysis.ela_score}
               label="Mapa de calor · Análisis ELA"
-              isPreview={!realHeatmapUrl}
             />
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -262,53 +261,6 @@ export default function AdvancedScanResult({
                 </>
               }
             />
-          </div>
-        </section>
-      )}
-
-      {imageAnalysis && elaHeatmapUrl && (
-        <section className="rounded-3xl border border-border-soft bg-white p-5">
-          <h3 className="flex items-center font-bold text-secondary">
-            Mapa de calor ELA
-            <InfoTip title="Cómo leer el mapa ELA">
-              <p>
-                <strong>Azul:</strong> diferencia baja.{" "}
-                <strong>Verde/amarillo:</strong> intermedia.{" "}
-                <strong>Rojo:</strong> alta tras recomprimir.
-              </p>
-              <p>
-                Compare cada región con su entorno. Bordes, texto, ruido y
-                múltiples guardados también pueden iluminarse; no demuestra
-                fraude por sí solo.
-              </p>
-            </InfoTip>
-          </h3>
-          <p className="mt-1 text-xs leading-5 text-text-soft">
-            Resalta diferencias de recompresión. Las zonas más intensas indican
-            errores de compresión distintos al entorno; pueden orientar una
-            revisión, pero no prueban por sí solas que exista edición o fraude.
-          </p>
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <figure className="overflow-hidden rounded-2xl bg-slate-950">
-              <img
-                src={previewUrl}
-                alt="Imagen original analizada"
-                className="h-full min-h-64 w-full object-contain"
-              />
-              <figcaption className="bg-slate-900 px-3 py-2 text-center text-[10px] text-white/70">
-                Original
-              </figcaption>
-            </figure>
-            <figure className="overflow-hidden rounded-2xl bg-slate-950">
-              <img
-                src={elaHeatmapUrl}
-                alt="Mapa de diferencias de recompresión ELA"
-                className="h-full min-h-64 w-full object-contain"
-              />
-              <figcaption className="bg-slate-900 px-3 py-2 text-center text-[10px] text-white/70">
-                Diferencias ELA amplificadas
-              </figcaption>
-            </figure>
           </div>
         </section>
       )}
