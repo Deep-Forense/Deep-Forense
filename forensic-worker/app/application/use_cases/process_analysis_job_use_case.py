@@ -163,7 +163,7 @@ class ProcessAnalysisJobUseCase:
         exif_score = await self._exif_analyzer.analyze(content)
 
         ela_result = await self._ela_analyzer.analyze(content)
-        await self._storage.save(
+        ela_heatmap_ref = await self._storage.save(
             path=f"jobs/{job_id}/artifacts/{artifact.artifact_id}/ela_heatmap.png",
             content=ela_result.heatmap_png,
         )
@@ -190,5 +190,6 @@ class ProcessAnalysisJobUseCase:
             gemini_flags=list(gemini_flags),
             image_classification=image_classification,
             image_classification_message=classification_message,
+            ela_heatmap_ref=ela_heatmap_ref,
         )
 

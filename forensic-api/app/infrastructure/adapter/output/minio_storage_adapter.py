@@ -26,3 +26,14 @@ class MinioStorageAdapter(StoragePort):
             length=len(content),
         )
         return f"{self._bucket}/{path}"
+
+    async def get(self, storage_ref: str) -> bytes:
+        bucket, _, path = storage_ref.partition("/")
+        if not path:
+            raise ValueError(f"storage_ref inválido (se espera 'bucket/path'): {storage_ref!r}")
+        response = self._client.get_object(bucket, path)
+        try:
+            return response.read()
+        finally:
+            response.close()
+            response.release_conn()

@@ -21,6 +21,7 @@ class ArtifactAnalysis:
     gemini_flags: list = field(default_factory=list)  # solo IMAGE
     image_classification: Optional[str] = None  # solo IMAGE
     image_classification_message: Optional[str] = None  # solo IMAGE
+    ela_heatmap_ref: Optional[str] = None  # solo IMAGE; storage_ref ('{bucket}/{path}') del PNG en MinIO
 
     def to_dict(self) -> dict:
         return {
@@ -35,6 +36,7 @@ class ArtifactAnalysis:
             "gemini_flags": self.gemini_flags,
             "image_classification": self.image_classification,
             "image_classification_message": self.image_classification_message,
+            "ela_heatmap_ref": self.ela_heatmap_ref,
         }
 
     def numeric_scores(self) -> list:

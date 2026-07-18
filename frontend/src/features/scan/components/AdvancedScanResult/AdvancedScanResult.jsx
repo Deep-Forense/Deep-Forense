@@ -4,9 +4,12 @@ import { FiFileText, FiImage, FiRefreshCw, FiShield } from "react-icons/fi";
 import { Badge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
 import { AnalysisMetric } from "@/components/molecules/AnalysisMetric";
+import { HeatmapViewer } from "@/components/molecules/HeatmapViewer";
 import { ImageClassificationPanel } from "@/features/scan/components/ImageClassificationPanel";
 import { VerdictBadge } from "@/features/scan/components/VerdictBadge";
 import { percentScore, VERDICT_PRESENTATION } from "@/features/scan/domain/scanPresentation";
+import { MOCK_ELA_HEATMAP_URL } from "@/features/scan/mocks/dashboard.mock";
+import { fetchElaHeatmapObjectUrl } from "@/features/scan/services/scan.service";
 
 function EvidencePreview({ previewUrl, fileName }) {
   if (previewUrl) return <img src={previewUrl} alt="Evidencia original analizada" className="h-full min-h-64 w-full object-contain" />;
@@ -24,11 +27,13 @@ function SignalCard({ label, score, unavailableText = "No aplicable" }) {
   );
 }
 
-export default function AdvancedScanResult({ file, mode, result, onReset }) {
+export default function AdvancedScanResult({ file, mode, result, onReset, resetLabel = "Analizar otro archivo" }) {
   const [previewUrl, setPreviewUrl] = useState("");
+  const [realHeatmapUrl, setRealHeatmapUrl] = useState("");
   const isImage = file?.type?.startsWith("image/");
   const presentation = VERDICT_PRESENTATION[result.verdict] || VERDICT_PRESENTATION.SUSPICIOUS;
   const imageAnalysis = result.imageAnalysis;
+  const heatmapPath = imageAnalysis?.ela_heatmap_url;
 
   useEffect(() => {
     if (!isImage || !(file instanceof Blob)) return undefined;
@@ -36,6 +41,29 @@ export default function AdvancedScanResult({ file, mode, result, onReset }) {
     setPreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [file, isImage]);
+
+  useEffect(() => {
+    if (!heatmapPath) {
+      setRealHeatmapUrl("");
+      return undefined;
+    }
+
+    let cancelled = false;
+    let objectUrl = "";
+    fetchElaHeatmapObjectUrl(heatmapPath).then(
+      (url) => {
+        if (cancelled) return;
+        objectUrl = url;
+        setRealHeatmapUrl(url);
+      },
+      () => { if (!cancelled) setRealHeatmapUrl(""); },
+    );
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [heatmapPath]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
@@ -71,6 +99,14 @@ export default function AdvancedScanResult({ file, mode, result, onReset }) {
         <section className="rounded-3xl border border-border-soft bg-white p-5">
           <h3 className="font-bold text-secondary">Señales técnicas reales</h3>
           <p className="mt-1 text-xs text-text-soft">Los porcentajes representan anomalía de cada técnica, no probabilidad directa de IA.</p>
+          <div className="mt-4">
+            <HeatmapViewer
+              heatmapUrl={realHeatmapUrl || MOCK_ELA_HEATMAP_URL}
+              score={imageAnalysis.ela_score}
+              label="Mapa de calor · Análisis ELA"
+              isPreview={!realHeatmapUrl}
+            />
+          </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <SignalCard label="Metadatos EXIF" score={imageAnalysis.exif_score} />
             <SignalCard label="Análisis ELA" score={imageAnalysis.ela_score} />
@@ -87,7 +123,7 @@ export default function AdvancedScanResult({ file, mode, result, onReset }) {
 
       <footer className="flex flex-wrap items-center justify-between gap-3 text-xs text-text-soft">
         <span>{result.completedAt ? `Completado: ${new Intl.DateTimeFormat("es-EC", { dateStyle: "medium", timeStyle: "short" }).format(new Date(result.completedAt))}` : "Análisis completado"}</span>
-        <Button type="button" variant="outline" onClick={onReset}><FiRefreshCw /> Analizar otro archivo</Button>
+        <Button type="button" variant="outline" onClick={onReset}><FiRefreshCw /> {resetLabel}</Button>
       </footer>
     </motion.div>
   );

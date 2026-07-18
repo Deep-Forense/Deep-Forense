@@ -5,10 +5,11 @@ solo valida forma de entrada y delega en los casos de uso inyectados.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 
 from app.application.dto.submit_analysis_command import SubmitAnalysisCommand
 from app.application.dto.submit_url_analysis_command import SubmitUrlAnalysisCommand
+from app.application.ports.get_artifact_heatmap_input_port import GetArtifactHeatmapInputPort
 from app.application.ports.get_job_input_port import GetJobInputPort
 from app.application.ports.list_jobs_input_port import ListJobsInputPort
 from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
@@ -92,11 +93,16 @@ def _consolidated_view(consolidated: Optional[dict], full: bool) -> Optional[dic
     return {k: v for k, v in consolidated.items() if k not in ("dominant_artifact", "policy_applied")}
 
 
-def _artifact_view(artifact, full: bool) -> dict:
+def _artifact_view(artifact, full: bool, job_id: str) -> dict:
     view = {"artifact_id": artifact.artifact_id, "type": str(artifact.type), "status": artifact.status}
     if full:
         view["origin"] = artifact.origin
-        view["analysis"] = artifact.analysis
+        analysis = dict(artifact.analysis) if artifact.analysis else artifact.analysis
+        if analysis and analysis.get("ela_heatmap_ref"):
+            analysis["ela_heatmap_url"] = (
+                f"/api/forensic/jobs/{job_id}/artifacts/{artifact.artifact_id}/ela-heatmap"
+            )
+        view["analysis"] = analysis
     return view
 
 
@@ -156,7 +162,22 @@ async def get_job(
         "status": job.status,
         "detail_level": detail_level,
         "consolidated": _consolidated_view(job.consolidated, full),
-        "artifacts": [_artifact_view(a, full) for a in job.artifacts],
+        "artifacts": [_artifact_view(a, full, job.job_id) for a in job.artifacts],
         "created_at": job.created_at,
         "completed_at": job.completed_at,
     }
+
+
+@router.get("/jobs/{job_id}/artifacts/{artifact_id}/ela-heatmap")
+async def get_artifact_ela_heatmap(
+    job_id: str,
+    artifact_id: str,
+    use_case: GetArtifactHeatmapInputPort = Depends(),
+    user_id: Optional[str] = Depends(optional_user_id),
+):
+    """Imagen PNG del heatmap ELA (T2.M2). Mismo control de acceso que
+    detail_level=full: solo el dueño del job puede verla."""
+    heatmap_png = await use_case.execute(job_id, artifact_id, user_id)
+    if heatmap_png is None:
+        raise HTTPException(status_code=404, detail="Heatmap no encontrado.")
+    return Response(content=heatmap_png, media_type="image/png")

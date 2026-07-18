@@ -15,7 +15,7 @@ export interface ScanResult {
     artifactId: string;
     type: "TEXT" | "IMAGE";
     status: "COMPLETED" | "FAILED";
-    analysis: Record<string, unknown> | null;
+    analysis: (Record<string, unknown> & { ela_heatmap_url?: string }) | null;
   }>;
-  imageAnalysis: Record<string, unknown> | null;
+  imageAnalysis: (Record<string, unknown> & { ela_heatmap_url?: string }) | null;
 }
