@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Container } from "@/components/atoms/Container";
+import { Modal } from "@/components/molecules/Modal";
 import { DashboardStatCard } from "@/components/molecules/DashboardStatCard";
 import { DashboardHeader } from "@/components/organisms/DashboardHeader";
 import { Footer } from "@/components/organisms/Footer";
 import { ForensicScannerCard } from "@/components/organisms/ForensicScannerCard";
+import { AdvancedScanResult } from "@/features/scan/components/AdvancedScanResult";
 import { ScanHistoryTable } from "@/features/scan/components/ScanHistoryTable";
-import { getScanHistory } from "@/features/scan/services/scan.service";
+import { getJobDetail, getScanHistory } from "@/features/scan/services/scan.service";
 import { getApiErrorMessage } from "@/utils/apiError";
 
 export default function DashboardPage() {
@@ -14,6 +16,10 @@ export default function DashboardPage() {
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState("");
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [jobDetail, setJobDetail] = useState(null);
+  const [jobDetailLoading, setJobDetailLoading] = useState(false);
+  const [jobDetailError, setJobDetailError] = useState("");
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -49,6 +55,23 @@ export default function DashboardPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const viewJobDetail = async (job) => {
+    setSelectedJob(job);
+    setJobDetail(null);
+    setJobDetailError("");
+    setJobDetailLoading(true);
+    try {
+      const detail = await getJobDetail(job.jobId);
+      setJobDetail(detail);
+    } catch (error) {
+      setJobDetailError(getApiErrorMessage(error, "No se pudo cargar el detalle del análisis."));
+    } finally {
+      setJobDetailLoading(false);
+    }
+  };
+
+  const closeJobDetail = () => setSelectedJob(null);
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader onNewAnalysis={startNewAnalysis} />
@@ -67,11 +90,33 @@ export default function DashboardPage() {
           </section>
 
           <div className="mt-8">
-            <ScanHistoryTable jobs={history} loading={historyLoading} error={historyError} onRetry={loadHistory} />
+            <ScanHistoryTable
+              jobs={history}
+              loading={historyLoading}
+              error={historyError}
+              onRetry={loadHistory}
+              onViewDetail={viewJobDetail}
+            />
           </div>
         </Container>
       </main>
       <Footer />
+
+      <Modal open={Boolean(selectedJob)} onClose={closeJobDetail}>
+        {jobDetailLoading && <p className="p-4 text-sm text-text-soft">Cargando detalle del análisis...</p>}
+        {!jobDetailLoading && jobDetailError && (
+          <p role="alert" className="p-4 text-sm text-red-700">{jobDetailError}</p>
+        )}
+        {!jobDetailLoading && !jobDetailError && jobDetail && (
+          <AdvancedScanResult
+            file={{ name: selectedJob?.fileName, type: selectedJob?.artifactType === "URL" ? "text/html" : "" }}
+            mode={selectedJob?.artifactType}
+            result={jobDetail}
+            onReset={closeJobDetail}
+            resetLabel="Cerrar"
+          />
+        )}
+      </Modal>
     </div>
   );
 }

@@ -28,3 +28,18 @@ export const FLAG_LABELS = {
 };
 
 export const percentScore = (score) => score == null ? null : Math.round(score * 100);
+
+export const JOB_STEP_LABELS = {
+  JOB_CREATED: "Creado",
+  JOB_PROCESSING: "Procesando",
+  JOB_COMPLETED: "Completado",
+  JOB_FAILED: "Fallido",
+};
+
+export const severityFromScore = (score) => {
+  const percentage = percentScore(score);
+  if (percentage == null) return { label: "Sin datos", variant: "neutral" };
+  if (percentage >= 66) return { label: "Anomalía alta", variant: "danger" };
+  if (percentage >= 33) return { label: "Anomalía moderada", variant: "warning" };
+  return { label: "Anomalía baja", variant: "success" };
+};
