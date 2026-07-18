@@ -15,7 +15,6 @@ from app.application.ports.list_jobs_input_port import ListJobsInputPort
 from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
 from app.application.ports.submit_url_analysis_input_port import SubmitUrlAnalysisInputPort
 from app.domain.exceptions import UnsupportedUrlContentError, UrlDownloadError
-from app.domain.ports.storage_port import StoragePort
 from app.infrastructure.adapter.input.rest.security import optional_user_id, require_user_id
 
 router = APIRouter(prefix="/api/forensic")
