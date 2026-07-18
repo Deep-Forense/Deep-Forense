@@ -1,6 +1,8 @@
 """Puerto de salida: StoragePort.
 
-Guarda el contenido binario de un artifact (MinIO en producción).
+Guarda el contenido binario de un artifact (MinIO en producción). También
+lee derivados que escribe forensic-worker (p.ej. ela_heatmap.png) para
+poder servirlos de vuelta al frontend (GET .../ela-heatmap).
 """
 from abc import ABC, abstractmethod
 
@@ -11,6 +13,7 @@ class StoragePort(ABC):
         """Devuelve la referencia de almacenamiento (storage_ref)."""
         ...
 
-    async def get(self, path: str) -> bytes:
-        """Lee un objeto privado por su ruta dentro del bucket."""
-        raise NotImplementedError
+    @abstractmethod
+    async def get(self, storage_ref: str) -> bytes:
+        """Lee el contenido apuntado por un storage_ref ('{bucket}/{path}')."""
+        ...

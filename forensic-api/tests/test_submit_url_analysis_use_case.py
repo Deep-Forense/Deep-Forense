@@ -61,6 +61,9 @@ class FakeStorage(StoragePort):
         self.saved[path] = content
         return f"bucket/{path}"
 
+    async def get(self, storage_ref: str) -> bytes:
+        raise NotImplementedError
+
 
 class FakeRepository(AnalysisJobRepositoryPort):
     def __init__(self) -> None:

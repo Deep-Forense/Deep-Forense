@@ -5,6 +5,7 @@ import { Button } from "@/components/atoms/Button";
 import { SCAN_MODES } from "@/features/scan/components/ScanModeTabs/ScanModeTabs";
 import { ScanResult } from "@/features/scan/components/ScanResult";
 import { AdvancedScanResult } from "@/features/scan/components/AdvancedScanResult";
+import { JobProgress } from "@/features/scan/components/JobProgress";
 import { scanUrl, submitAndWaitForScan, waitForScanResult } from "@/features/scan/services/scan.service";
 import { UploadDropzone } from "@/components/molecules/UploadDropzone";
 import { UrlAnalyzeBox } from "@/components/molecules/UrlAnalyzeBox";
@@ -15,6 +16,7 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
   const [activeMode, setActiveMode] = useState("document");
   const [selectedFile, setSelectedFile] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [processingEvents, setProcessingEvents] = useState([]);
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState("");
 
@@ -27,10 +29,16 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
   const runAnalysis = async () => {
     if (!selectedFile) return;
     setError("");
+    setProcessingEvents([]);
     setIsAnalyzing(true);
 
     try {
-      const result = await submitAndWaitForScan({ file: selectedFile, mode: activeMode, authenticated });
+      const result = await submitAndWaitForScan({
+        file: selectedFile,
+        mode: activeMode,
+        authenticated,
+        onEvent: (event) => setProcessingEvents((current) => [...current, event]),
+      });
       setScanResult(result);
       onAnalysisCompleted?.(result);
     } catch (requestError) {
@@ -44,11 +52,14 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
     setActiveMode("document");
     setSelectedFile({ name: url, type: "text/html" });
     setError("");
+    setProcessingEvents([]);
     setIsAnalyzing(true);
 
     try {
       const created = await scanUrl(url, authenticated);
-      const result = await waitForScanResult(created.job_id);
+      const result = await waitForScanResult(created.job_id, {
+        onEvent: (event) => setProcessingEvents((current) => [...current, event]),
+      });
       setScanResult(result);
       onAnalysisCompleted?.(result);
     } catch (requestError) {
@@ -62,6 +73,7 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
     setSelectedFile(null);
     setScanResult(null);
     setIsAnalyzing(false);
+    setProcessingEvents([]);
     setError("");
   };
 
@@ -85,6 +97,10 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
           ) : (
             <ScanResult file={selectedFile} mode={activeMode} result={scanResult} onReset={resetScanner} />
           )}
+        </div>
+      ) : isAnalyzing ? (
+        <div className="relative">
+          <JobProgress events={processingEvents} fileName={selectedFile?.name} />
         </div>
       ) : (
       <div className="relative grid gap-5 lg:grid-cols-[220px_1fr]">
@@ -172,14 +188,8 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
                     {selectedFile.name}
                   </span>
                 </div>
-                <Button
-                  type="button"
-                  className="w-full"
-                  size="lg"
-                  disabled={isAnalyzing}
-                  onClick={runAnalysis}
-                >
-                  {isAnalyzing ? "Analizando evidencia..." : "Analizar archivo"}
+                <Button type="button" className="w-full" size="lg" onClick={runAnalysis}>
+                  Analizar archivo
                 </Button>
               </div>
             )}
