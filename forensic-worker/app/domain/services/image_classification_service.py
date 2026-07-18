@@ -14,20 +14,31 @@ MESSAGES = {
     "INCONCLUSIVE": "Las señales disponibles no permiten clasificar el origen de la imagen con suficiente claridad.",
 }
 
+CLASSIFICATION_RISK_FLOORS = {"AI_GENERATED": 0.75, "AI_MODIFIED": 0.75, "EDITED": 0.40}
+
+
+def classification_from_flags(flags: list[str]) -> str | None:
+    present = set(flags)
+    if present & AI_GENERATED_FLAGS:
+        return "AI_GENERATED"
+    if present & AI_MODIFIED_FLAGS:
+        return "AI_MODIFIED"
+    if present & SCREENSHOT_FLAGS:
+        return "SCREENSHOT"
+    if present & EDITED_FLAGS:
+        return "EDITED"
+    return None
+
+
+def risk_floor_for_flags(flags: list[str]) -> float:
+    return CLASSIFICATION_RISK_FLOORS.get(classification_from_flags(flags), 0.0)
+
 
 class ImageClassificationService:
     def classify(self, flags: list[str], exif_score: float, ela_score: float) -> tuple[str, str]:
-        present = set(flags)
-        if present & AI_GENERATED_FLAGS:
-            classification = "AI_GENERATED"
-        elif present & AI_MODIFIED_FLAGS:
-            classification = "AI_MODIFIED"
-        elif present & SCREENSHOT_FLAGS:
-            classification = "SCREENSHOT"
-        elif present & EDITED_FLAGS:
-            classification = "EDITED"
-        elif exif_score <= 0.2 and ela_score < 0.15:
+        classification = classification_from_flags(flags)
+        if classification is None and exif_score <= 0.2 and ela_score < 0.15:
             classification = "AUTHENTIC"
-        else:
+        elif classification is None:
             classification = "INCONCLUSIVE"
         return classification, MESSAGES[classification]

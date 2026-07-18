@@ -5,7 +5,7 @@ solo valida forma de entrada y delega en los casos de uso inyectados.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 
 from app.application.dto.submit_analysis_command import SubmitAnalysisCommand
 from app.application.dto.submit_url_analysis_command import SubmitUrlAnalysisCommand
@@ -14,6 +14,7 @@ from app.application.ports.list_jobs_input_port import ListJobsInputPort
 from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
 from app.application.ports.submit_url_analysis_input_port import SubmitUrlAnalysisInputPort
 from app.domain.exceptions import UnsupportedUrlContentError, UrlDownloadError
+from app.domain.ports.storage_port import StoragePort
 from app.infrastructure.adapter.input.rest.security import optional_user_id, require_user_id
 
 router = APIRouter(prefix="/api/forensic")
@@ -160,3 +161,30 @@ async def get_job(
         "created_at": job.created_at,
         "completed_at": job.completed_at,
     }
+
+
+@router.get("/jobs/{job_id}/artifacts/{artifact_id}/ela-heatmap")
+async def get_ela_heatmap(
+    job_id: str,
+    artifact_id: str,
+    use_case: GetJobInputPort = Depends(),
+    storage: StoragePort = Depends(),
+    user_id: str = Depends(require_user_id),
+):
+    """Entrega el PNG ELA privado únicamente al dueño del job."""
+    job = await use_case.execute(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job no encontrado.")
+    if job.user_id != user_id:
+        raise HTTPException(status_code=403, detail="No tiene acceso a esta evidencia.")
+
+    artifact = next((item for item in job.artifacts if item.artifact_id == artifact_id), None)
+    if artifact is None or str(artifact.type) != "IMAGE" or artifact.status != "COMPLETED":
+        raise HTTPException(status_code=404, detail="Mapa ELA no disponible.")
+
+    path = f"jobs/{job_id}/artifacts/{artifact_id}/ela_heatmap.png"
+    try:
+        content = await storage.get(path)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="Mapa ELA no disponible.") from exc
+    return Response(content=content, media_type="image/png")

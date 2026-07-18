@@ -20,6 +20,7 @@ from app.application.use_cases.list_jobs_use_case import ListJobsUseCase
 from app.application.use_cases.submit_analysis_use_case import SubmitAnalysisUseCase
 from app.application.use_cases.submit_url_analysis_use_case import SubmitUrlAnalysisUseCase
 from app.domain.services.artifact_selection_service import ArtifactSelectionService
+from app.domain.ports.storage_port import StoragePort
 from app.infrastructure.adapter.input.rest.analysis_controller import router as analysis_router
 from app.infrastructure.adapter.output.celery_task_queue_adapter import CeleryTaskQueueAdapter
 from app.infrastructure.adapter.output.httpx_url_downloader_adapter import HttpxUrlDownloaderAdapter
@@ -87,6 +88,7 @@ app.dependency_overrides[SubmitAnalysisInputPort] = lambda: submit_analysis_use_
 app.dependency_overrides[SubmitUrlAnalysisInputPort] = lambda: submit_url_analysis_use_case
 app.dependency_overrides[GetJobInputPort] = lambda: get_job_use_case
 app.dependency_overrides[ListJobsInputPort] = lambda: list_jobs_use_case
+app.dependency_overrides[StoragePort] = lambda: storage
 
 
 @app.on_event("startup")

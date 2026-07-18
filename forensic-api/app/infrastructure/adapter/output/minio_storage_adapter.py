@@ -4,6 +4,7 @@ Guarda el contenido binario de un artifact en MinIO bajo la ruta
 `jobs/{job_id}/...` -- aquí se recibe ya el "path" resuelto por quien
 invoca (el use case), así que este adaptador solo sabe hablar con MinIO.
 """
+import asyncio
 import io
 
 from minio import Minio
@@ -26,3 +27,14 @@ class MinioStorageAdapter(StoragePort):
             length=len(content),
         )
         return f"{self._bucket}/{path}"
+
+    async def get(self, path: str) -> bytes:
+        return await asyncio.to_thread(self._get_sync, path)
+
+    def _get_sync(self, path: str) -> bytes:
+        response = self._client.get_object(self._bucket, path)
+        try:
+            return response.read()
+        finally:
+            response.close()
+            response.release_conn()

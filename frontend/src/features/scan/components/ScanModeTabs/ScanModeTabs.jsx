@@ -4,7 +4,7 @@ export const SCAN_MODES = [
   {
     id: "document",
     label: "Documento",
-    description: "PDF, certificados, formularios y comprobantes.",
+    description: "PDF con texto o páginas escaneadas.",
     icon: FiFileText,
   },
   {

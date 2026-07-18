@@ -14,6 +14,7 @@ Reglas:
     queda determinado solo por las banderas.
 """
 from app.domain.entities.artifact_analysis import ArtifactAnalysis
+from app.domain.services.image_classification_service import risk_floor_for_flags
 
 SIGNAL_WEIGHT = 0.7
 FLAGS_WEIGHT = 0.3
@@ -26,11 +27,12 @@ class FraudScoringService:
         signals = analysis.numeric_scores()
         distinct_flags = set(analysis.ai_flags) | set(analysis.gemini_flags)
         flags_factor = min(1.0, len(distinct_flags) / FLAGS_SATURATION)
+        semantic_floor = risk_floor_for_flags(list(distinct_flags))
 
         if not signals:
             # Sin señales técnicas aplicables: el riesgo lo dictan las banderas.
-            return round(flags_factor, 4)
+            return round(max(flags_factor, semantic_floor), 4)
 
         signal_mean = sum(signals) / len(signals)
         combined = SIGNAL_WEIGHT * signal_mean + FLAGS_WEIGHT * flags_factor
-        return round(min(1.0, max(0.0, combined)), 4)
+        return round(min(1.0, max(0.0, combined, semantic_floor)), 4)

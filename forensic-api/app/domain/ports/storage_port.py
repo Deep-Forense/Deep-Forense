@@ -10,3 +10,7 @@ class StoragePort(ABC):
     async def save(self, path: str, content: bytes) -> str:
         """Devuelve la referencia de almacenamiento (storage_ref)."""
         ...
+
+    async def get(self, path: str) -> bytes:
+        """Lee un objeto privado por su ruta dentro del bucket."""
+        raise NotImplementedError
