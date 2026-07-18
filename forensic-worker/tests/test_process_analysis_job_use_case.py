@@ -181,6 +181,7 @@ async def test_image_artifact_gets_full_analysis_and_heatmap_saved():
     assert analysis.gemini_flags == ["cloned_region"]
     assert analysis.ai_flags == ["cloned_region"]
     assert "jobs/job-3/artifacts/a-img/ela_heatmap.png" in storage.saved
+    assert analysis.ela_heatmap_ref == "bucket/jobs/job-3/artifacts/a-img/ela_heatmap.png"
 
 
 async def test_non_jpeg_image_skips_dct_without_penalty():
