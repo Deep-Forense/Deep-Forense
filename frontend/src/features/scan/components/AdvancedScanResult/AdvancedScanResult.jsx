@@ -5,33 +5,67 @@ import { Badge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
 import { AnalysisMetric } from "@/components/molecules/AnalysisMetric";
 import { HeatmapViewer } from "@/components/molecules/HeatmapViewer";
+import { InfoTip } from "@/components/molecules/InfoTip";
 import { ImageClassificationPanel } from "@/features/scan/components/ImageClassificationPanel";
 import { VerdictBadge } from "@/features/scan/components/VerdictBadge";
-import { percentScore, VERDICT_PRESENTATION } from "@/features/scan/domain/scanPresentation";
-import { MOCK_ELA_HEATMAP_URL } from "@/features/scan/mocks/dashboard.mock";
+import {
+  percentScore,
+  VERDICT_PRESENTATION,
+} from "@/features/scan/domain/scanPresentation";
 import { fetchElaHeatmapObjectUrl } from "@/features/scan/services/scan.service";
 
 function EvidencePreview({ previewUrl, fileName }) {
-  if (previewUrl) return <img src={previewUrl} alt="Evidencia original analizada" className="h-full min-h-64 w-full object-contain" />;
-  return <div className="flex min-h-64 flex-col items-center justify-center bg-secondary text-white/80"><FiFileText className="text-6xl" /><span className="mt-3 max-w-64 truncate px-4 text-xs">{fileName}</span></div>;
-}
-
-function SignalCard({ label, score, unavailableText = "No aplicable" }) {
-  const percentage = percentScore(score);
+  if (previewUrl)
+    return (
+      <img
+        src={previewUrl}
+        alt="Evidencia original analizada"
+        className="h-full min-h-64 w-full object-contain"
+      />
+    );
   return (
-    <div className="rounded-2xl border border-border-soft bg-slate-50 p-4">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-text-soft">{label}</p>
-      <strong className="mt-2 block text-2xl text-secondary">{percentage == null ? "—" : `${percentage}%`}</strong>
-      <p className="mt-1 text-[10px] text-text-soft">{percentage == null ? unavailableText : "Nivel de anomalía detectado"}</p>
+    <div className="flex min-h-64 flex-col items-center justify-center bg-secondary text-white/80">
+      <FiFileText className="text-6xl" />
+      <span className="mt-3 max-w-64 truncate px-4 text-xs">{fileName}</span>
     </div>
   );
 }
 
-export default function AdvancedScanResult({ file, mode, result, onReset, resetLabel = "Analizar otro archivo" }) {
+function SignalCard({
+  label,
+  score,
+  unavailableText = "No aplicable",
+  explanation,
+}) {
+  const percentage = percentScore(score);
+  return (
+    <div className="rounded-2xl border border-border-soft bg-slate-50 p-4">
+      <p className="flex items-center text-[10px] font-bold uppercase tracking-wide text-text-soft">
+        {label}
+        <InfoTip title={`Cómo interpretar ${label}`}>{explanation}</InfoTip>
+      </p>
+      <strong className="mt-2 block text-2xl text-secondary">
+        {percentage == null ? "—" : `${percentage}%`}
+      </strong>
+      <p className="mt-1 text-[10px] text-text-soft">
+        {percentage == null ? unavailableText : "Nivel de anomalía detectado"}
+      </p>
+    </div>
+  );
+}
+
+export default function AdvancedScanResult({
+  file,
+  mode,
+  result,
+  onReset,
+  resetLabel = "Analizar otro archivo",
+}) {
   const [previewUrl, setPreviewUrl] = useState("");
   const [realHeatmapUrl, setRealHeatmapUrl] = useState("");
   const isImage = file?.type?.startsWith("image/");
-  const presentation = VERDICT_PRESENTATION[result.verdict] || VERDICT_PRESENTATION.SUSPICIOUS;
+  const presentation =
+    VERDICT_PRESENTATION[result.verdict] || VERDICT_PRESENTATION.SUSPICIOUS;
   const imageAnalysis = result.imageAnalysis;
   const heatmapPath = imageAnalysis?.ela_heatmap_url;
 
@@ -56,7 +90,9 @@ export default function AdvancedScanResult({ file, mode, result, onReset, resetL
         objectUrl = url;
         setRealHeatmapUrl(url);
       },
-      () => { if (!cancelled) setRealHeatmapUrl(""); },
+      () => {
+        if (!cancelled) setRealHeatmapUrl("");
+      },
     );
 
     return () => {
@@ -66,30 +102,95 @@ export default function AdvancedScanResult({ file, mode, result, onReset, resetL
   }, [heatmapPath]);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-5"
+    >
       <header className="flex flex-col gap-3 rounded-2xl border border-border-soft bg-slate-50/80 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2"><h2 className="truncate text-xl font-extrabold text-secondary">{file?.name || "evidencia-digital"}</h2><Badge variant="neutral">{mode}</Badge></div>
-          <p className="mt-1 text-xs text-text-soft">Job {result.jobId} · Reporte técnico autenticado</p>
+          <div className="flex items-center gap-2">
+            <h2 className="truncate text-xl font-extrabold text-secondary">
+              {file?.name || "evidencia-digital"}
+            </h2>
+            <Badge variant="neutral">{mode}</Badge>
+          </div>
+          <p className="mt-1 text-xs text-text-soft">
+            Job {result.jobId} · Reporte técnico autenticado
+          </p>
         </div>
         <VerdictBadge verdict={result.verdict} />
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
         <section className="rounded-3xl border border-border-soft bg-white p-5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-text-soft">Veredicto consolidado</p>
-          <div className={`mt-4 flex items-center gap-3 ${presentation.tone}`}><FiShield className="text-4xl" /><strong className="text-2xl">{presentation.label}</strong></div>
-          <p className="mt-3 text-xs leading-5 text-text-soft">{result.summary}</p>
-          <div className="mt-6 space-y-5">
-            <AnalysisMetric label="Autenticidad estimada" value={result.authenticityPercentage} />
-            <AnalysisMetric label="Riesgo forense" value={result.riskPercentage} tone="risk" />
+          <p className="text-[10px] font-bold uppercase tracking-wider text-text-soft">
+            Veredicto consolidado
+          </p>
+          <div className={`mt-4 flex items-center gap-3 ${presentation.tone}`}>
+            <FiShield className="text-4xl" />
+            <strong className="text-2xl">{presentation.label}</strong>
           </div>
-          <div className="mt-6 rounded-2xl bg-background p-3 text-xs"><p className="font-semibold text-secondary">Consolidación</p><code className="mt-1 block text-[10px] text-primary">{result.policyApplied}</code></div>
+          <p className="mt-3 text-xs leading-5 text-text-soft">
+            {result.summary}
+          </p>
+          <div className="mt-6 space-y-5">
+            <AnalysisMetric
+              label="Autenticidad estimada"
+              value={result.authenticityPercentage}
+              explanation={
+                <>
+                  <p>
+                    Es 100% menos el riesgo forense. No es una probabilidad
+                    científica de autenticidad.
+                  </p>
+                  <p>
+                    Un valor alto significa que se encontraron menos señales de
+                    riesgo.
+                  </p>
+                </>
+              }
+            />
+            <AnalysisMetric
+              label="Riesgo forense"
+              value={result.riskPercentage}
+              tone="risk"
+              explanation={
+                <>
+                  <p>
+                    Combina 70% de señales técnicas y 30% de flags de IA. IA
+                    generada/modificada tiene un mínimo de 75%;
+                    edición/composición, 40%.
+                  </p>
+                  <p>
+                    <strong>0–39%:</strong> sin riesgo crítico.{" "}
+                    <strong>40–70%:</strong> revisión recomendada.{" "}
+                    <strong>71–100%:</strong> alto riesgo.
+                  </p>
+                </>
+              }
+            />
+          </div>
+          <div className="mt-6 rounded-2xl bg-background p-3 text-xs">
+            <p className="font-semibold text-secondary">
+              Cómo se combinaron las evidencias
+            </p>
+            <p className="mt-1 font-semibold text-primary">
+              {result.policyPresentation.label}
+            </p>
+            <p className="mt-1 text-[10px] leading-4 text-text-soft">
+              {result.policyPresentation.description}
+            </p>
+          </div>
         </section>
 
         <section className="overflow-hidden rounded-3xl border border-border-soft bg-tertiary/50 p-4">
-          <p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-primary"><FiImage /> Evidencia original</p>
-          <div className="overflow-hidden rounded-2xl bg-slate-950"><EvidencePreview previewUrl={previewUrl} fileName={file?.name} /></div>
+          <p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-primary">
+            <FiImage /> Evidencia original
+          </p>
+          <div className="overflow-hidden rounded-2xl bg-slate-950">
+            <EvidencePreview previewUrl={previewUrl} fileName={file?.name} />
+          </div>
         </section>
       </div>
 
@@ -98,32 +199,88 @@ export default function AdvancedScanResult({ file, mode, result, onReset, resetL
       {imageAnalysis && (
         <section className="rounded-3xl border border-border-soft bg-white p-5">
           <h3 className="font-bold text-secondary">Señales técnicas reales</h3>
-          <p className="mt-1 text-xs text-text-soft">Los porcentajes representan anomalía de cada técnica, no probabilidad directa de IA.</p>
+          <p className="mt-1 text-xs text-text-soft">
+            Los porcentajes representan anomalía de cada técnica, no
+            probabilidad directa de IA.
+          </p>
           <div className="mt-4">
             <HeatmapViewer
-              heatmapUrl={realHeatmapUrl || MOCK_ELA_HEATMAP_URL}
+              heatmapUrl={realHeatmapUrl}
               score={imageAnalysis.ela_score}
               label="Mapa de calor · Análisis ELA"
-              isPreview={!realHeatmapUrl}
             />
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <SignalCard label="Metadatos EXIF" score={imageAnalysis.exif_score} />
-            <SignalCard label="Análisis ELA" score={imageAnalysis.ela_score} />
-            <SignalCard label="DCT / Benford" score={imageAnalysis.dct_benford_score} unavailableText={imageAnalysis.benford_applicable === false ? "No aplicable al formato" : "Sin resultado"} />
+            <SignalCard
+              label="Metadatos EXIF"
+              score={imageAnalysis.exif_score}
+              explanation={
+                <>
+                  <p>
+                    Heurística acumulativa: sin EXIF +20%; software de edición
+                    +45%; fechas distintas +35%; fecha original eliminada +15%.
+                  </p>
+                  <p>No tener EXIF no prueba manipulación.</p>
+                </>
+              }
+            />
+            <SignalCard
+              label="Análisis ELA"
+              score={imageAnalysis.ela_score}
+              explanation={
+                <>
+                  <p>
+                    Diferencia media tras recomprimir como JPEG, dividida para
+                    25 y limitada a 100%.
+                  </p>
+                  <p>
+                    No tiene intervalos de veredicto propios: es una señal
+                    continua y debe leerse junto al mapa.
+                  </p>
+                </>
+              }
+            />
+            <SignalCard
+              label="DCT / Benford"
+              score={imageAnalysis.dct_benford_score}
+              unavailableText={
+                imageAnalysis.benford_applicable === false
+                  ? "No aplicable al formato"
+                  : "Sin resultado"
+              }
+              explanation={
+                <>
+                  <p>
+                    Solo aplica a JPEG. Compara coeficientes DCT con la
+                    distribución de Benford.
+                  </p>
+                  <p>
+                    Distancia 0 = 0%; distancia 0.30 o mayor = 100%. No es
+                    probabilidad de fraude.
+                  </p>
+                </>
+              }
+            />
           </div>
         </section>
       )}
 
       {!imageAnalysis && (
         <section className="rounded-3xl border border-border-soft bg-white p-5 text-sm text-text-soft">
-          Este artefacto no contiene análisis visual. Los detalles disponibles dependen del tipo de archivo procesado.
+          Este artefacto no contiene análisis visual. Los detalles disponibles
+          dependen del tipo de archivo procesado.
         </section>
       )}
 
       <footer className="flex flex-wrap items-center justify-between gap-3 text-xs text-text-soft">
-        <span>{result.completedAt ? `Completado: ${new Intl.DateTimeFormat("es-EC", { dateStyle: "medium", timeStyle: "short" }).format(new Date(result.completedAt))}` : "Análisis completado"}</span>
-        <Button type="button" variant="outline" onClick={onReset}><FiRefreshCw /> {resetLabel}</Button>
+        <span>
+          {result.completedAt
+            ? `Completado: ${new Intl.DateTimeFormat("es-EC", { dateStyle: "medium", timeStyle: "short" }).format(new Date(result.completedAt))}`
+            : "Análisis completado"}
+        </span>
+        <Button type="button" variant="outline" onClick={onReset}>
+          <FiRefreshCw /> {resetLabel}
+        </Button>
       </footer>
     </motion.div>
   );

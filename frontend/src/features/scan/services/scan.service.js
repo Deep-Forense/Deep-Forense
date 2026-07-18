@@ -4,7 +4,6 @@ export const scanDemoFile = async (file, mode) => {
   const formData = new FormData();
 
   formData.append("file", file);
-  formData.append("type", mode);
 
   const response = await analyzeDemo(formData);
   return response.data;
@@ -14,7 +13,6 @@ export const scanAuthenticatedFile = async (file, mode) => {
   const formData = new FormData();
 
   formData.append("file", file);
-  formData.append("type", mode);
 
   const response = await analyzeAuthenticated(formData);
   return response.data;
@@ -30,6 +28,11 @@ export const scanUrl = async (url, authenticated = false) => {
 };
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const CONSOLIDATION_PRESENTATION = {
+  worst_case_dominates: { label: "Prevalece la evidencia de mayor riesgo", description: "Si hay varios elementos, el resultado global toma el porcentaje del elemento con mayor riesgo." },
+  weighted_average: { label: "Promedio ponderado de evidencias", description: "Combina todos los elementos y da mayor peso a las imágenes (70%) que al texto (30%)." },
+};
 
 export const normalizeScanResult = (job) => {
   const consolidated = job.consolidated || {};
@@ -55,6 +58,9 @@ export const normalizeScanResult = (job) => {
     fraudScore: consolidated.fraud_score ?? riskPercentage / 100,
     model: "forensic-worker · pipeline de análisis",
     policyApplied: consolidated.policy_applied || "pending",
+    policyPresentation: CONSOLIDATION_PRESENTATION[consolidated.policy_applied] || {
+      label: "Resultado individual", description: "El resultado se calculó con la evidencia disponible.",
+    },
     summary:
       verdict === "APPROVED"
         ? "No se detectaron indicadores críticos en el análisis consolidado."

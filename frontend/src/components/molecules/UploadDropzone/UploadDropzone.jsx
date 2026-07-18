@@ -24,7 +24,7 @@ export default function UploadDropzone({ mode = "document", onFileSelect }) {
         className="hidden"
         accept={
           isDocument
-            ? ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+            ? ".pdf"
             : ".jpg,.jpeg,.png,.webp"
         }
         onChange={handleFileChange}
@@ -42,7 +42,7 @@ export default function UploadDropzone({ mode = "document", onFileSelect }) {
 
       <span className="mt-2 text-sm text-text-soft">
         {isDocument
-          ? "PDF, DOCX, JPG o PNG hasta 50MB"
+          ? "PDF hasta 50MB"
           : "JPG, PNG o WEBP hasta 50MB"}
       </span>
 
