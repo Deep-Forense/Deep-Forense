@@ -14,6 +14,13 @@ _LABELS = {
     "total": ("total a pagar", "importe total", "grand total", "total"),
 }
 
+# Elementos que suelen aparecer DESPUÉS del monto en la misma línea y que la
+# extracción ("el último número de la línea") tomaría por error como si fueran
+# el monto: notas/referencias entre paréntesis ("(Ref. 2024)") y porcentajes
+# ("21%", con o sin paréntesis). Se eliminan antes de buscar el monto.
+_PARENTHETICAL = re.compile(r"\([^)]*\)")
+_PERCENT_FIGURE = re.compile(r"\d[\d.,]*\s*%")
+
 
 @dataclass(frozen=True)
 class DocumentConsistencyResult:
@@ -50,7 +57,8 @@ def _labeled_amounts(text: str) -> dict[str, float]:
                 continue
             if key == "total" and ("subtotal" in lowered or "base imponible" in lowered):
                 continue
-            matches = _AMOUNT.findall(line)
+            cleaned = _PERCENT_FIGURE.sub(" ", _PARENTHETICAL.sub(" ", line))
+            matches = _AMOUNT.findall(cleaned)
             amount = _number(matches[-1]) if matches else None
             if amount is not None:
                 found[key] = amount

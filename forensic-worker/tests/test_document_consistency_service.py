@@ -40,3 +40,23 @@ def test_incorrect_line_total_is_flagged():
     )
     assert "line_item_total_mismatch" in result.flags
     assert result.score >= 0.4
+
+
+def test_trailing_reference_after_total_is_not_taken_as_the_amount():
+    # Antes del fix, "2024" (una referencia entre paréntesis DESPUÉS del
+    # monto) se tomaba como el total por ser "el último número de la línea".
+    result = DocumentConsistencyService().analyze(
+        "Subtotal: 100,00\nIVA: 12,00\nTotal a pagar: 112,00 (Ref. 2024)"
+    )
+    assert result.checks[0]["reported_total"] == 112.0
+    assert result.checks[0]["passed"] is True
+
+
+def test_trailing_percentage_after_tax_is_not_taken_as_the_amount():
+    # "IVA (21%): 100,00" — el porcentaje aparece antes del monto entre
+    # paréntesis; debe tomarse 100,00 como el monto del impuesto, no 21.
+    result = DocumentConsistencyService().analyze(
+        "Subtotal: 100,00\nIVA (21%): 21,00\nTotal a pagar: 121,00"
+    )
+    assert result.checks[0]["tax"] == 21.0
+    assert result.checks[0]["passed"] is True
