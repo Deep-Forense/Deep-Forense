@@ -2,6 +2,7 @@
 import json
 
 import httpx
+import pytest
 
 from app.infrastructure.adapter.output.deepseek_analyzer_adapter import DeepSeekAnalyzerAdapter
 
@@ -68,3 +69,44 @@ async def test_ignores_non_numeric_amounts_in_response():
     result = await adapter.analyze("recibo")
 
     assert result.financial_amounts == [10.0, 20.5]
+
+
+async def test_parses_json_inside_markdown_fence():
+    def handler(request):
+        payload = {"document_type": "letter", "financial_amounts": [], "ai_findings": []}
+        return httpx.Response(200, json={"choices": [{"message": {
+            "content": f"```json\n{json.dumps(payload)}\n```"
+        }}]})
+    adapter = DeepSeekAnalyzerAdapter(api_key="k", client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    assert (await adapter.analyze("texto")).document_type == "letter"
+
+
+async def test_empty_provider_content_is_rejected_instead_of_approving():
+    def handler(request):
+        return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": ""}}]})
+    adapter = DeepSeekAnalyzerAdapter(api_key="k", client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    with pytest.raises(ValueError, match="vacío"):
+        await adapter.analyze("texto")
+
+
+async def test_ai_generated_text_requires_second_high_confirmation():
+    responses = [
+        {"document_type": "letter", "financial_amounts": [], "ai_findings": [{"flag": "possible_ai_generated_text", "confidence": "HIGH", "evidence": "patrones localizados"}]},
+        {"ai_findings": []},
+    ]
+    def handler(request):
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(responses.pop(0))}}]})
+    adapter = DeepSeekAnalyzerAdapter(api_key="k", client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    assert (await adapter.analyze("texto")).ai_flags == []
+
+
+async def test_confirmed_ai_edited_text_is_kept():
+    finding = {"flag": "possible_ai_edited_text", "confidence": "HIGH", "evidence": "cambio abrupto localizado"}
+    responses = [
+        {"document_type": "contract", "financial_amounts": [], "ai_findings": [finding]},
+        {"ai_findings": [finding]},
+    ]
+    def handler(request):
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(responses.pop(0))}}]})
+    adapter = DeepSeekAnalyzerAdapter(api_key="k", client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    assert (await adapter.analyze("texto")).ai_flags == ["possible_ai_edited_text"]

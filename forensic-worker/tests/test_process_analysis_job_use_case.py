@@ -15,7 +15,7 @@ from app.domain.ports.dct_analyzer_port import DctAnalyzerPort
 from app.domain.ports.ela_analyzer_port import ElaAnalyzerPort, ElaResult
 from app.domain.ports.exif_analyzer_port import ExifAnalyzerPort
 from app.domain.ports.image_cognitive_analyzer_port import ImageCognitiveAnalyzerPort
-from app.domain.ports.ocr_port import OcrPort
+from app.domain.ports.ocr_port import EmbeddedImage, OcrExtraction, OcrPort
 from app.domain.ports.storage_port import StoragePort
 from app.domain.ports.text_cognitive_analyzer_port import (
     TextCognitiveAnalyzerPort,
@@ -96,10 +96,21 @@ class FakeOcr(OcrPort):
         return "FACTURA total 100"
 
 
+class FakeOcrWithImage(FakeOcr):
+    async def extract_with_metadata(self, content: bytes) -> OcrExtraction:
+        return OcrExtraction(
+            text="FACTURA total 100",
+            page_count=1,
+            analyzed_pages=1,
+            embedded_images=1,
+            visual_images=(EmbeddedImage(JPEG, 1, 800, 600),),
+        )
+
+
 class FakeTextAnalyzer(TextCognitiveAnalyzerPort):
     def __init__(self, document_type="invoice", amounts=None) -> None:
         self._document_type = document_type
-        self._amounts = amounts if amounts is not None else [float(i) for i in range(1, 21)]
+        self._amounts = amounts if amounts is not None else [10 ** (i / 10) for i in range(31)]
 
     async def analyze(self, text: str) -> TextCognitiveResult:
         return TextCognitiveResult(
@@ -112,7 +123,13 @@ class FakeImageAnalyzer(ImageCognitiveAnalyzerPort):
         return ["cloned_region"]
 
 
-def _use_case(repository, storage, ela=None, text_analyzer=None) -> ProcessAnalysisJobUseCase:
+class BrokenImageAnalyzer(ImageCognitiveAnalyzerPort):
+    async def analyze(self, image_bytes: bytes) -> list:
+        raise RuntimeError("cuota agotada")
+
+
+def _use_case(repository, storage, ela=None, text_analyzer=None, ocr=None,
+              image_analyzer=None) -> ProcessAnalysisJobUseCase:
     return ProcessAnalysisJobUseCase(
         repository=repository,
         storage=storage,
@@ -120,9 +137,9 @@ def _use_case(repository, storage, ela=None, text_analyzer=None) -> ProcessAnaly
         ela_analyzer=ela or FakeEla(),
         dct_analyzer=FakeDct(),
         benford_analyzer=FakeBenford(),
-        ocr=FakeOcr(),
+        ocr=ocr or FakeOcr(),
         text_analyzer=text_analyzer or FakeTextAnalyzer(),
-        image_analyzer=FakeImageAnalyzer(),
+        image_analyzer=image_analyzer or FakeImageAnalyzer(),
         benford_applicability=BenfordApplicabilityService(min_amount_count=15),
         fraud_scoring=FraudScoringService(),
         consolidation=ConsolidationService(),  # worst_case_dominates default
@@ -224,6 +241,43 @@ async def test_financial_text_with_enough_amounts_gets_benford_score():
     _, analysis = repository.saved_results["a-txt"]
     assert analysis.benford_applicable is True
     assert analysis.benford_score == 0.1
+
+
+async def test_pdf_embedded_image_keeps_technical_evidence_if_ai_fails():
+    artifacts = [Artifact("a-txt", "TEXT", "bucket/factura.pdf")]
+    repository = FakeRepository(artifacts)
+    storage = FakeStorage({"bucket/factura.pdf": b"%PDF fake"})
+    use_case = _use_case(
+        repository, storage, ocr=FakeOcrWithImage(), image_analyzer=BrokenImageAnalyzer()
+    )
+
+    result = await use_case.execute("job-visual")
+
+    assert result["status"] == "COMPLETED"
+    _, analysis = repository.saved_results["a-txt"]
+    assert analysis.document_visual_score == 0.2333
+    assert analysis.document_visual_evidence[0]["cognitive_available"] is False
+    assert analysis.document_visual_evidence[0]["ela_score"] == 0.4
+    assert analysis.document_visual_heatmap_ref.endswith("document_image_1_ela.png")
+
+
+async def test_direct_image_keeps_technical_evidence_if_ai_fails():
+    artifacts = [Artifact("a-img", "IMAGE", "bucket/img.jpg")]
+    repository = FakeRepository(artifacts)
+    storage = FakeStorage({"bucket/img.jpg": JPEG})
+
+    result = await _use_case(
+        repository, storage, image_analyzer=BrokenImageAnalyzer()
+    ).execute("job-image-partial")
+
+    assert result["status"] == "COMPLETED"
+    _, analysis = repository.saved_results["a-img"]
+    assert analysis.exif_score == 0.2
+    assert analysis.ela_score == 0.4
+    assert analysis.cognitive_available is False
+    assert analysis.image_classification == "INCONCLUSIVE"
+    assert result["consolidated"]["verdict"] == "INCONCLUSIVE"
+    assert result["consolidated"]["authenticity_percentage"] is None
 
 
 async def test_already_completed_job_is_idempotent():

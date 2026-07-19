@@ -42,7 +42,7 @@ export default function DashboardPage() {
     const averageRisk = scored.length
       ? Math.round(scored.reduce((sum, job) => sum + job.riskPercentage, 0) / scored.length)
       : 0;
-    const suspicious = history.filter((job) => ["SUSPICIOUS", "REJECTED"].includes(job.verdict)).length;
+    const suspicious = history.filter((job) => ["SUSPICIOUS", "REJECTED", "INCONCLUSIVE"].includes(job.verdict)).length;
     return [
       { id: "analyzed", label: "Archivos analizados", value: historyTotal, trend: "Total", tone: "primary" },
       { id: "risk", label: "Promedio de riesgo", value: `${averageRisk}%`, trend: "Últimos 20", tone: "primary" },

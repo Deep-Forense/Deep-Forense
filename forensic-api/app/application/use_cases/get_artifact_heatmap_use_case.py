@@ -25,7 +25,10 @@ class GetArtifactHeatmapUseCase(GetArtifactHeatmapInputPort):
         if artifact is None or not artifact.analysis:
             return None
 
-        heatmap_ref = artifact.analysis.get("ela_heatmap_ref")
+        heatmap_ref = (
+            artifact.analysis.get("ela_heatmap_ref")
+            or artifact.analysis.get("document_visual_heatmap_ref")
+        )
         if not heatmap_ref:
             return None
 

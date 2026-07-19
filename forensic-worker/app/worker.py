@@ -28,6 +28,7 @@ from app.application.use_cases.process_analysis_job_use_case import ProcessAnaly
 from app.domain.services.benford_applicability_service import BenfordApplicabilityService
 from app.domain.services.consolidation_service import ConsolidationService
 from app.domain.services.fraud_scoring_service import FraudScoringService
+from app.domain.services.document_consistency_service import DocumentConsistencyService
 from app.domain.services.image_classification_service import ImageClassificationService
 from app.infrastructure.adapter.output.benford_statistical_adapter import BenfordStatisticalAdapter
 from app.infrastructure.adapter.output.deepseek_analyzer_adapter import DeepSeekAnalyzerAdapter
@@ -42,6 +43,9 @@ from app.infrastructure.adapter.output.mongo_analysis_job_repository import (
 from app.infrastructure.adapter.output.opencv_dct_adapter import OpenCvDctAdapter
 from app.infrastructure.adapter.output.opencv_ela_adapter import OpenCvElaAdapter
 from app.infrastructure.adapter.output.pillow_exif_adapter import PillowExifAdapter
+from app.infrastructure.adapter.output.pymupdf_structure_analyzer_adapter import (
+    PyMuPdfStructureAnalyzerAdapter,
+)
 
 # --- Configuración desde entorno (ver docker-compose.yml / .env.example) ----
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -61,7 +65,10 @@ DEEPSEEK_OCR_BASE_URL = (
 DEEPSEEK_OCR_MODEL = os.getenv("DEEPSEEK_OCR_MODEL") or "deepseek-ai/DeepSeek-OCR"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash"
-BENFORD_MIN_AMOUNT_COUNT = int(os.getenv("BENFORD_MIN_AMOUNT_COUNT", "15"))
+BENFORD_MIN_AMOUNT_COUNT = int(os.getenv("BENFORD_MIN_AMOUNT_COUNT", "30"))
+PDF_MAX_PAGES = int(os.getenv("PDF_MAX_PAGES", "10"))
+PDF_MAX_EMBEDDED_IMAGES = int(os.getenv("PDF_MAX_EMBEDDED_IMAGES", "5"))
+PDF_IMAGE_ANALYSIS_CONCURRENCY = int(os.getenv("PDF_IMAGE_ANALYSIS_CONCURRENCY", "2"))
 CONSOLIDATION_POLICY = os.getenv("CONSOLIDATION_POLICY", "worst_case_dominates")
 
 celery_app = Celery(
@@ -125,6 +132,8 @@ def build_process_job_use_case() -> ProcessAnalysisJobUseCase:
             api_key=DEEPSEEK_OCR_DEEPINFRA_API_KEY,
             base_url=DEEPSEEK_OCR_BASE_URL,
             model=DEEPSEEK_OCR_MODEL,
+            max_pdf_pages=PDF_MAX_PAGES,
+            max_embedded_images=PDF_MAX_EMBEDDED_IMAGES,
         ),
         text_analyzer=DeepSeekAnalyzerAdapter(
             api_key=DEEPSEEK_API_KEY,
@@ -141,6 +150,9 @@ def build_process_job_use_case() -> ProcessAnalysisJobUseCase:
         fraud_scoring=FraudScoringService(),
         consolidation=ConsolidationService(policy=CONSOLIDATION_POLICY),
         image_classification=ImageClassificationService(),
+        document_consistency=DocumentConsistencyService(),
+        pdf_structure_analyzer=PyMuPdfStructureAnalyzerAdapter(),
+        document_image_concurrency=PDF_IMAGE_ANALYSIS_CONCURRENCY,
     )
 
 

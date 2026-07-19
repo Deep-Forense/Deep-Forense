@@ -77,3 +77,15 @@ def test_edited_flag_imposes_review_floor():
     analysis = ArtifactAnalysis(exif_score=0.0, ela_score=0.0,
         ai_flags=["cloned_region"], gemini_flags=["cloned_region"])
     assert service.score(analysis) == 0.4
+
+
+def test_confirmed_ai_generated_text_has_suspicious_risk_floor():
+    analysis = ArtifactAnalysis(document_type="letter", benford_applicable=False,
+                                ai_flags=["possible_ai_generated_text"])
+    assert service.score(analysis) == 0.65
+
+
+def test_confirmed_ai_edited_text_has_review_risk_floor():
+    analysis = ArtifactAnalysis(document_type="contract", benford_applicable=False,
+                                ai_flags=["possible_ai_edited_text"])
+    assert service.score(analysis) == 0.5

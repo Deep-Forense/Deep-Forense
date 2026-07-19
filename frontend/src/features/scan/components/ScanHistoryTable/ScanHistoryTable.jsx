@@ -10,6 +10,8 @@ const statusVariant = {
 const verdictConfig = {
   APPROVED: { label: "Sin riesgo crítico", variant: "success" },
   REJECTED: { label: "Fraudulento", variant: "danger" },
+  SUSPICIOUS: { label: "Requiere revisión", variant: "warning" },
+  INCONCLUSIVE: { label: "Análisis incompleto", variant: "warning" },
   PENDING: { label: "Pendiente", variant: "warning" },
   FAILED: { label: "Fallido", variant: "danger" },
 };

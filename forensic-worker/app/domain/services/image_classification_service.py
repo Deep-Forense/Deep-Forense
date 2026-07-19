@@ -15,6 +15,10 @@ MESSAGES = {
 }
 
 CLASSIFICATION_RISK_FLOORS = {"AI_GENERATED": 0.75, "AI_MODIFIED": 0.75, "EDITED": 0.40}
+TEXT_FLAG_RISK_FLOORS = {
+    "possible_ai_generated_text": 0.65,
+    "possible_ai_edited_text": 0.50,
+}
 
 
 def classification_from_flags(flags: list[str]) -> str | None:
@@ -31,7 +35,9 @@ def classification_from_flags(flags: list[str]) -> str | None:
 
 
 def risk_floor_for_flags(flags: list[str]) -> float:
-    return CLASSIFICATION_RISK_FLOORS.get(classification_from_flags(flags), 0.0)
+    image_floor = CLASSIFICATION_RISK_FLOORS.get(classification_from_flags(flags), 0.0)
+    text_floor = max((TEXT_FLAG_RISK_FLOORS.get(flag, 0.0) for flag in flags), default=0.0)
+    return max(image_floor, text_floor)
 
 
 class ImageClassificationService:

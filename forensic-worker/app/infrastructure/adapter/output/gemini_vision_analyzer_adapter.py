@@ -4,6 +4,7 @@ import json
 import logging
 
 import httpx
+from app.infrastructure.adapter.output.http_retry import post_with_retry
 
 from app.domain.ports.image_cognitive_analyzer_port import ImageCognitiveAnalyzerPort
 
@@ -125,7 +126,7 @@ esquema, sin agregar flags nuevos."""
         client = self._client or httpx.AsyncClient(timeout=_TIMEOUT_SECONDS)
         owns_client = self._client is None
         try:
-            response = await client.post(url, json=payload, headers=headers)
+            response = await post_with_retry(client, url, json=payload, headers=headers)
             response.raise_for_status()
         finally:
             if owns_client:
