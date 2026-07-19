@@ -58,6 +58,15 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.MAIN_HOST }}" >> ~/.ssh/known_hosts
 
+      # El .env real (passwords, JWT_SECRET, API keys) nunca vive en el repo:
+      # se guarda completo en el secret ENV_FILE_CONTENTS y se escribe a disco
+      # solo dentro del runner efímero de este job, nunca se commitea.
+      - name: Escribir .env de producción
+        env:
+          ENV_FILE_CONTENTS: ${{ secrets.ENV_FILE_CONTENTS }}
+        run: |
+          printf '%s\n' "$ENV_FILE_CONTENTS" > .env.prod
+
       - name: Transferir imagenes a la instancia (docker save | ssh | docker load)
         # El "name: deepforense" fijo en docker-compose.yml asegura que la imagen
         # se llame igual aca y en la instancia (deepforense-<servicio>:latest),
@@ -71,9 +80,15 @@ jobs:
           done
 
       - name: Copiar archivos de despliegue
+        # .env.prod se sube como /opt/deepforense/.env (sin el sufijo ".prod"):
+        # Docker Compose lee automaticamente un archivo ".env" en el directorio
+        # desde donde se ejecuta "docker compose up", sin necesidad de pasarlo
+        # con --env-file ni tocar docker-compose.yml/docker-compose.prod.yml.
         run: |
           scp -i ~/.ssh/deploy_key docker-compose.yml docker-compose.prod.yml ubuntu@${{ secrets.MAIN_HOST }}:/opt/deepforense/
           scp -i ~/.ssh/deploy_key -r kong ubuntu@${{ secrets.MAIN_HOST }}:/opt/deepforense/
+          scp -i ~/.ssh/deploy_key .env.prod ubuntu@${{ secrets.MAIN_HOST }}:/opt/deepforense/.env
+          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.MAIN_HOST }} 'chmod 600 /opt/deepforense/.env'
 
       - name: Levantar los servicios en main
         run: |
