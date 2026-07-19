@@ -8,6 +8,7 @@ import com.deepforense.auth.domain.port.PasswordHasherPort;
 import com.deepforense.auth.domain.port.UserRepositoryPort;
 import com.deepforense.auth.domain.valueobject.Email;
 import com.deepforense.auth.domain.valueobject.HashedPassword;
+import com.deepforense.auth.domain.valueobject.RawPassword;
 
 /** No lleva @Service: se instancia en infrastructure/config (composition root). */
 public class RegisterUserUseCase implements RegisterUserInputPort {
@@ -28,7 +29,8 @@ public class RegisterUserUseCase implements RegisterUserInputPort {
             throw new DuplicateEmailException(email.value());
         }
 
-        HashedPassword hashedPassword = passwordHasher.hash(command.rawPassword());
+        RawPassword rawPassword = new RawPassword(command.rawPassword());
+        HashedPassword hashedPassword = passwordHasher.hash(rawPassword.value());
         User user = User.register(command.name(), email, hashedPassword);
 
         userRepository.save(user);
