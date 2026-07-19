@@ -43,8 +43,7 @@ async def _submit(
         )
 
     if url is not None:
-        # FOR-97 (HU3.2): URL directa a imagen/PDF -> 1 artifact.
-        # FOR-98 (HU3.3): página HTML -> scraping (1 TEXT + hasta N IMAGE).
+        # Únicamente una URL directa a imagen JPEG, PNG o WEBP.
         try:
             job = await url_use_case.execute(SubmitUrlAnalysisCommand(user_id=user_id, url=url))
         except (UnsupportedUrlContentError, UrlDownloadError) as exc:
@@ -108,18 +107,15 @@ def _artifact_view(artifact, full: bool, job_id: str) -> dict:
 
 
 def _job_summary(job) -> dict:
-    """Vista JobSummary del contrato (docs/openapi.yaml). input_source se
-    deriva del origin de los artifacts: SCRAPED_* => URL; en otro caso UPLOAD
-    (limitación conocida: una URL directa a imagen/PDF de FOR-97 crea
-    artifacts origin=UPLOAD y se reporta como UPLOAD)."""
+    """Vista resumida; DIRECT_URL identifica imágenes obtenidas por enlace."""
     consolidated = job.consolidated or {}
-    scraped = any(a.origin.startswith("SCRAPED") for a in job.artifacts)
+    from_url = any(a.origin == "DIRECT_URL" or a.origin.startswith("SCRAPED") for a in job.artifacts)
     return {
         "job_id": job.job_id,
         "status": job.status,
         "verdict": consolidated.get("verdict"),
         "fraud_score": consolidated.get("fraud_score"),
-        "input_source": "URL" if scraped else "UPLOAD",
+        "input_source": "URL" if from_url else "UPLOAD",
         "created_at": job.created_at,
     }
 

@@ -49,8 +49,8 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
   };
 
   const handleAnalyzeUrl = async (url) => {
-    setActiveMode("document");
-    setSelectedFile({ name: url, type: "text/html" });
+    setActiveMode("image");
+    setSelectedFile({ name: url, type: "image/url" });
     setError("");
     setProcessingEvents([]);
     setIsAnalyzing(true);
@@ -63,7 +63,7 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
       setScanResult(result);
       onAnalysisCompleted?.(result);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, "El backend todavía no admite análisis por URL."));
+      setError(getApiErrorMessage(requestError, "No se encontró una imagen en ese enlace. Corrígelo y vuelve a intentarlo."));
     } finally {
       setIsAnalyzing(false);
     }

@@ -39,4 +39,4 @@ async def test_url_without_path_segment_gets_default_file_name():
 
     resource = await adapter.download("http://x.com/")
 
-    assert resource.file_name == "downloaded"
+    assert resource.file_name == "imagen"

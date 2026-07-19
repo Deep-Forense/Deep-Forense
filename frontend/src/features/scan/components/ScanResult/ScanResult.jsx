@@ -23,7 +23,7 @@ export default function ScanResult({ file, mode, result, onReset }) {
   const FileIcon = mode === "image" ? FiImage : FiFileText;
 
   useEffect(() => {
-    if (!isImage) return undefined;
+    if (!isImage || !(file instanceof Blob)) return undefined;
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);

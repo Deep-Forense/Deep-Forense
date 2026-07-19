@@ -20,6 +20,7 @@ import asyncio
 import os
 
 from celery import Celery
+from celery.signals import worker_process_init, worker_process_shutdown
 from minio import Minio
 from pymongo import MongoClient
 
@@ -59,7 +60,7 @@ DEEPSEEK_OCR_BASE_URL = (
 )
 DEEPSEEK_OCR_MODEL = os.getenv("DEEPSEEK_OCR_MODEL") or "deepseek-ai/DeepSeek-OCR"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash"
 BENFORD_MIN_AMOUNT_COUNT = int(os.getenv("BENFORD_MIN_AMOUNT_COUNT", "15"))
 CONSOLIDATION_POLICY = os.getenv("CONSOLIDATION_POLICY", "worst_case_dominates")
 
@@ -75,24 +76,46 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="America/Guayaquil",
     enable_utc=True,
+    broker_connection_retry_on_startup=True,
 )
 
-# Clientes de infraestructura compartidos entre tareas (conexiones pooled).
-_mongo_client = MongoClient(MONGO_URI)
-_jobs_collection = _mongo_client[MONGO_DB_NAME]["analysis_jobs"]
-_minio_client = Minio(
-    MINIO_ENDPOINT,
-    access_key=MINIO_ACCESS_KEY,
-    secret_key=MINIO_SECRET_KEY,
-    secure=False,
-)
+# Clientes creados dentro de cada proceso hijo; MongoClient no es fork-safe.
+_mongo_client = None
+_minio_client = None
+
+
+def _initialize_process_clients() -> None:
+    global _mongo_client, _minio_client
+    if _mongo_client is None:
+        _mongo_client = MongoClient(MONGO_URI)
+    if _minio_client is None:
+        _minio_client = Minio(
+            MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY,
+            secret_key=MINIO_SECRET_KEY, secure=False,
+        )
+
+
+@worker_process_init.connect
+def initialize_worker_process(**_kwargs) -> None:
+    _initialize_process_clients()
+
+
+@worker_process_shutdown.connect
+def shutdown_worker_process(**_kwargs) -> None:
+    global _mongo_client, _minio_client
+    if _mongo_client is not None:
+        _mongo_client.close()
+    _mongo_client = None
+    _minio_client = None
 
 
 def build_process_job_use_case() -> ProcessAnalysisJobUseCase:
     """Se construye por invocación: los adaptadores HTTP async no deben
     compartirse entre event loops distintos (cada tarea corre su asyncio.run)."""
+    _initialize_process_clients()
+    jobs_collection = _mongo_client[MONGO_DB_NAME]["analysis_jobs"]
     return ProcessAnalysisJobUseCase(
-        repository=MongoAnalysisJobRepository(_jobs_collection),
+        repository=MongoAnalysisJobRepository(jobs_collection),
         storage=MinioStorageAdapter(_minio_client, bucket=MINIO_BUCKET),
         exif_analyzer=PillowExifAdapter(),
         ela_analyzer=OpenCvElaAdapter(),

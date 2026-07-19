@@ -34,9 +34,9 @@ def _jpeg_without_exif() -> bytes:
     return buffer.getvalue()
 
 
-async def test_missing_exif_gives_low_nonzero_score():
+async def test_missing_exif_does_not_raise_risk_by_itself():
     score = await PillowExifAdapter().analyze(_jpeg_without_exif())
-    assert 0.0 < score <= 0.3
+    assert score == 0.0
 
 
 async def test_editing_software_raises_score():

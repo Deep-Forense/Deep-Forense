@@ -5,8 +5,8 @@ se suman y se recorta a [0,1]):
 
   +0.45 Software de edición conocido (Photoshop, GIMP, etc.) en el tag Software.
   +0.35 DateTime (fecha de modificación) distinto de DateTimeOriginal.
-  +0.20 Sin EXIF en absoluto (metadatos eliminados: común en redes sociales,
-        pero también primer paso al ocultar una edición).
+  Sin EXIF no suma riesgo: es común que aplicaciones y redes sociales lo
+  eliminen por privacidad o durante la recompresión.
   +0.15 Hay fecha de modificación pero se eliminó la fecha original.
 """
 import asyncio
@@ -36,7 +36,6 @@ _EDITING_SOFTWARE_KEYWORDS = (
 
 _SCORE_EDITING_SOFTWARE = 0.45
 _SCORE_DATETIME_MISMATCH = 0.35
-_SCORE_NO_EXIF = 0.20
 _SCORE_ORIGINAL_DATE_STRIPPED = 0.15
 
 
@@ -50,7 +49,7 @@ class PillowExifAdapter(ExifAnalyzerPort):
             exif = image.getexif()
 
             if len(exif) == 0:
-                return _SCORE_NO_EXIF
+                return 0.0
 
             score = 0.0
 

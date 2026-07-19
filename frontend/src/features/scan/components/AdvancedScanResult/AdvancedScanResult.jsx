@@ -217,10 +217,10 @@ export default function AdvancedScanResult({
               explanation={
                 <>
                   <p>
-                    Heurística acumulativa: sin EXIF +20%; software de edición
-                    +45%; fechas distintas +35%; fecha original eliminada +15%.
+                    Heurística acumulativa: software de edición +45%; fechas
+                    distintas +35%; fecha original eliminada +15%.
                   </p>
-                  <p>No tener EXIF no prueba manipulación.</p>
+                  <p>No tener EXIF suma 0% porque es común que aplicaciones y redes sociales lo eliminen.</p>
                 </>
               }
             />
