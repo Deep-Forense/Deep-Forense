@@ -64,7 +64,7 @@ DEEPSEEK_OCR_BASE_URL = (
 )
 DEEPSEEK_OCR_MODEL = os.getenv("DEEPSEEK_OCR_MODEL") or "deepseek-ai/DeepSeek-OCR"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-3-flash-preview"
 BENFORD_MIN_AMOUNT_COUNT = int(os.getenv("BENFORD_MIN_AMOUNT_COUNT", "30"))
 PDF_MAX_PAGES = int(os.getenv("PDF_MAX_PAGES", "10"))
 PDF_MAX_EMBEDDED_IMAGES = int(os.getenv("PDF_MAX_EMBEDDED_IMAGES", "5"))

@@ -9,7 +9,7 @@ from app.infrastructure.adapter.output.http_retry import post_with_retry
 from app.domain.ports.image_cognitive_analyzer_port import ImageCognitiveAnalyzerPort
 
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-_MODEL = "gemini-3.5-flash"
+_MODEL = "gemini-3-flash-preview"
 _TIMEOUT_SECONDS = 90.0
 logger = logging.getLogger(__name__)
 

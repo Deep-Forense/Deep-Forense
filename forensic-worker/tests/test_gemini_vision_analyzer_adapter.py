@@ -36,7 +36,7 @@ async def test_returns_only_high_confidence_findings():
     assert flags == ["cloned_region"]
     assert len(captured) == 1
     assert captured[0].headers["x-goog-api-key"] == "gm-key"
-    assert "gemini-3.5-flash:generateContent" in str(captured[0].url)
+    assert "gemini-3-flash-preview:generateContent" in str(captured[0].url)
     body = json.loads(captured[0].content)
     assert body["contents"][0]["parts"][0]["inline_data"]["mime_type"] == "image/jpeg"
 
