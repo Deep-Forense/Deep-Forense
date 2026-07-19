@@ -34,6 +34,15 @@ services:
         paths:
           - /api/auth
         strip_path: false
+        plugins:
+          # Mitiga fuerza bruta sobre /api/auth/login sin bloquear un uso
+          # normal: 10/min cubre con margen una sesión típica de
+          # login + register + logout + me combinados por un mismo cliente.
+          - name: rate-limiting
+            config:
+              minute: 10
+              policy: local
+              fault_tolerant: true
 
       - name: auth-docs-route
         paths:

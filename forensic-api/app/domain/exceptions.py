@@ -14,10 +14,7 @@ class JobNotFoundError(Exception):
 
 
 class UnsupportedUrlContentError(Exception):
-    """Se lanza cuando la URL no apunta directo a una imagen o PDF (FOR-97).
-
-    El caso HTML/scraping se implementa en Sprint 3 (FOR-98/T3.M1).
-    """
+    """Se lanza cuando la URL no contiene una imagen directa soportada."""
 
 
 class UrlDownloadError(Exception):

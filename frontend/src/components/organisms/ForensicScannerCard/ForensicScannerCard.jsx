@@ -21,6 +21,18 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
   const [error, setError] = useState("");
 
   const handleFileSelect = (file) => {
+    const maxBytes = 50 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setSelectedFile(null);
+      setError("El archivo supera el límite de 50 MB.");
+      return;
+    }
+    const extension = file.name.toLowerCase();
+    if (activeMode === "document" && !extension.endsWith(".pdf")) {
+      setSelectedFile(null);
+      setError("Solo se admiten documentos PDF.");
+      return;
+    }
     setSelectedFile(file);
     setScanResult(null);
     setError("");
@@ -49,8 +61,8 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
   };
 
   const handleAnalyzeUrl = async (url) => {
-    setActiveMode("document");
-    setSelectedFile({ name: url, type: "text/html" });
+    setActiveMode("image");
+    setSelectedFile({ name: url, type: "image/url" });
     setError("");
     setProcessingEvents([]);
     setIsAnalyzing(true);
@@ -63,7 +75,7 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
       setScanResult(result);
       onAnalysisCompleted?.(result);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, "El backend todavía no admite análisis por URL."));
+      setError(getApiErrorMessage(requestError, "No se encontró una imagen en ese enlace. Corrígelo y vuelve a intentarlo."));
     } finally {
       setIsAnalyzing(false);
     }

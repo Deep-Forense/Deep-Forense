@@ -5,6 +5,7 @@ solo valida forma de entrada y delega en los casos de uso inyectados.
 """
 from typing import Optional
 
+import fitz
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 
 from app.application.dto.submit_analysis_command import SubmitAnalysisCommand
@@ -15,16 +16,44 @@ from app.application.ports.list_jobs_input_port import ListJobsInputPort
 from app.application.ports.submit_analysis_input_port import SubmitAnalysisInputPort
 from app.application.ports.submit_url_analysis_input_port import SubmitUrlAnalysisInputPort
 from app.domain.exceptions import UnsupportedUrlContentError, UrlDownloadError
+from app.domain.ports.storage_port import StoragePort
 from app.infrastructure.adapter.input.rest.security import optional_user_id, require_user_id
 
 router = APIRouter(prefix="/api/forensic")
 
 
-def _resolve_artifact_type(file: Optional[UploadFile]) -> str:
-    """Heurística mínima de Sprint 1: por content-type. Se refina en Sprint 2/3
-    (OCR + clasificación real de documento vs imagen)."""
-    if file is not None and file.content_type and file.content_type.startswith("image/"):
+_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+_IMAGE_MAGICS = (b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n", b"RIFF")
+
+
+def _resolve_and_validate_artifact(content: bytes) -> str:
+    """Valida los bytes reales; el nombre y MIME enviados por el cliente no son confiables."""
+    if not content:
+        raise HTTPException(status_code=400, detail="El archivo está vacío.")
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="El archivo supera el límite de 50 MB.")
+    if any(content.startswith(magic) for magic in _IMAGE_MAGICS):
+        if content.startswith(b"RIFF") and (len(content) < 12 or content[8:12] != b"WEBP"):
+            raise HTTPException(status_code=400, detail="El archivo no es una imagen compatible.")
         return "IMAGE"
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(
+            status_code=400,
+            detail="Formato no compatible. Solo se admiten PDF, JPEG, PNG o WEBP.",
+        )
+    try:
+        with fitz.open(stream=content, filetype="pdf") as pdf:
+            if pdf.needs_pass:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El PDF está protegido con contraseña y no puede analizarse.",
+                )
+            if pdf.page_count < 1:
+                raise HTTPException(status_code=400, detail="El PDF no contiene páginas.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="El archivo no es un PDF válido o está dañado.") from exc
     return "TEXT"
 
 
@@ -42,8 +71,7 @@ async def _submit(
         )
 
     if url is not None:
-        # FOR-97 (HU3.2): URL directa a imagen/PDF -> 1 artifact.
-        # FOR-98 (HU3.3): página HTML -> scraping (1 TEXT + hasta N IMAGE).
+        # Únicamente una URL directa a imagen JPEG, PNG o WEBP.
         try:
             job = await url_use_case.execute(SubmitUrlAnalysisCommand(user_id=user_id, url=url))
         except (UnsupportedUrlContentError, UrlDownloadError) as exc:
@@ -51,11 +79,12 @@ async def _submit(
         return {"job_id": job.job_id, "status": "PENDING", "artifacts_count": len(job.artifacts)}
 
     content = await file.read()
+    artifact_type = _resolve_and_validate_artifact(content)
     command = SubmitAnalysisCommand(
         user_id=user_id,
         file_bytes=content,
         file_name=file.filename,
-        artifact_type=_resolve_artifact_type(file),
+        artifact_type=artifact_type,
     )
     job_id = await file_use_case.execute(command)
     return {"job_id": job_id, "status": "PENDING", "artifacts_count": 1}
@@ -102,23 +131,24 @@ def _artifact_view(artifact, full: bool, job_id: str) -> dict:
             analysis["ela_heatmap_url"] = (
                 f"/api/forensic/jobs/{job_id}/artifacts/{artifact.artifact_id}/ela-heatmap"
             )
+        if analysis and analysis.get("document_visual_heatmap_ref"):
+            analysis["document_visual_heatmap_url"] = (
+                f"/api/forensic/jobs/{job_id}/artifacts/{artifact.artifact_id}/ela-heatmap"
+            )
         view["analysis"] = analysis
     return view
 
 
 def _job_summary(job) -> dict:
-    """Vista JobSummary del contrato (docs/openapi.yaml). input_source se
-    deriva del origin de los artifacts: SCRAPED_* => URL; en otro caso UPLOAD
-    (limitación conocida: una URL directa a imagen/PDF de FOR-97 crea
-    artifacts origin=UPLOAD y se reporta como UPLOAD)."""
+    """Vista resumida; DIRECT_URL identifica imágenes obtenidas por enlace."""
     consolidated = job.consolidated or {}
-    scraped = any(a.origin.startswith("SCRAPED") for a in job.artifacts)
+    from_url = any(a.origin == "DIRECT_URL" or a.origin.startswith("SCRAPED") for a in job.artifacts)
     return {
         "job_id": job.job_id,
         "status": job.status,
         "verdict": consolidated.get("verdict"),
         "fraud_score": consolidated.get("fraud_score"),
-        "input_source": "URL" if scraped else "UPLOAD",
+        "input_source": "URL" if from_url else "UPLOAD",
         "created_at": job.created_at,
     }
 
@@ -127,7 +157,7 @@ def _job_summary(job) -> dict:
 async def list_jobs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    verdict: Optional[str] = Query(default=None, pattern="^(APPROVED|SUSPICIOUS|REJECTED)$"),
+    verdict: Optional[str] = Query(default=None, pattern="^(APPROVED|SUSPICIOUS|REJECTED|INCONCLUSIVE)$"),
     use_case: ListJobsInputPort = Depends(),
     user_id: str = Depends(require_user_id),
 ):

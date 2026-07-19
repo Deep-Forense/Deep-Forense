@@ -2,6 +2,7 @@ export const VERDICT_PRESENTATION = {
   APPROVED: { label: "Sin riesgo crítico", variant: "success", tone: "text-emerald-600" },
   SUSPICIOUS: { label: "Sospechoso", variant: "warning", tone: "text-amber-600" },
   REJECTED: { label: "Alto riesgo", variant: "danger", tone: "text-red-600" },
+  INCONCLUSIVE: { label: "Análisis incompleto", variant: "warning", tone: "text-blue-600" },
 };
 
 export const IMAGE_CLASSIFICATION_PRESENTATION = {
@@ -25,6 +26,19 @@ export const FLAG_LABELS = {
   warped_text: "Texto deformado",
   screenshot_ui_elements: "Elementos de interfaz capturados",
   screen_capture_artifacts: "Rastros de captura de pantalla",
+  arithmetic_total_mismatch: "El subtotal más impuestos no coincide con el total",
+  line_item_total_mismatch: "Cantidad por precio no coincide con el total de una línea",
+  line_items_subtotal_mismatch: "La suma de líneas no coincide con el subtotal",
+  inconsistent_totals: "Totales posiblemente inconsistentes",
+  date_inconsistency: "Fechas inconsistentes",
+  missing_tax_id: "Identificador tributario ausente",
+  possible_ai_generated_text: "Texto posiblemente generado por IA",
+  possible_ai_edited_text: "Texto posiblemente editado o reescrito por IA",
+  pdf_repaired_structure: "Estructura PDF reparada al abrirse",
+  pdf_suspicious_active_content: "Contenido activo potencialmente peligroso",
+  pdf_metadata_date_inconsistency: "Fechas de metadatos inconsistentes",
+  pdf_invalid_digital_signature: "Firma digital criptográficamente inválida",
+  pdf_modified_after_signature: "Cambios incompatibles posteriores a la firma",
 };
 
 export const percentScore = (score) => score == null ? null : Math.round(score * 100);

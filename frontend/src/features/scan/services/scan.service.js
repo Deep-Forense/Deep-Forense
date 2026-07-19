@@ -37,7 +37,9 @@ const CONSOLIDATION_PRESENTATION = {
 export const normalizeScanResult = (job) => {
   const consolidated = job.consolidated || {};
   const riskPercentage = consolidated.risk_percentage ?? Math.round((consolidated.fraud_score ?? 0) * 100);
-  const authenticityPercentage = consolidated.authenticity_percentage ?? 100 - riskPercentage;
+  const authenticityPercentage = consolidated.analysis_complete === false
+    ? null
+    : (consolidated.authenticity_percentage ?? 100 - riskPercentage);
   const verdict = consolidated.verdict || "SUSPICIOUS";
   const artifacts = (job.artifacts || []).map((artifact) => ({
     artifactId: artifact.artifact_id,
@@ -47,6 +49,7 @@ export const normalizeScanResult = (job) => {
     analysis: artifact.analysis || null,
   }));
   const imageArtifact = artifacts.find((artifact) => artifact.type === "IMAGE" && artifact.analysis);
+  const documentArtifact = artifacts.find((artifact) => artifact.type === "TEXT" && artifact.analysis);
 
   return {
     jobId: job.job_id,
@@ -62,11 +65,14 @@ export const normalizeScanResult = (job) => {
       label: "Resultado individual", description: "El resultado se calculó con la evidencia disponible.",
     },
     summary:
-      verdict === "APPROVED"
+      verdict === "INCONCLUSIVE"
+        ? "El análisis no pudo completar una evaluación crítica; no se afirma autenticidad."
+        : verdict === "APPROVED"
         ? "No se detectaron indicadores críticos en el análisis consolidado."
         : "El análisis detectó indicadores que requieren revisión adicional.",
     artifacts,
     imageAnalysis: imageArtifact?.analysis || null,
+    documentAnalysis: documentArtifact?.analysis || null,
     createdAt: job.created_at,
     completedAt: job.completed_at,
   };
@@ -136,7 +142,7 @@ export const getScanHistory = async ({ page = 1, pageSize = 20, verdict } = {}) 
         artifactType: job.input_source === "URL" ? "URL" : "UPLOAD",
         status: job.status,
         riskPercentage,
-        authenticityPercentage: riskPercentage == null ? null : 100 - riskPercentage,
+        authenticityPercentage: job.verdict === "INCONCLUSIVE" || riskPercentage == null ? null : 100 - riskPercentage,
         verdict: job.verdict || (job.status === "FAILED" ? "FAILED" : "PENDING"),
         createdAt: new Intl.DateTimeFormat("es-EC", {
           dateStyle: "medium",

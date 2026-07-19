@@ -60,6 +60,22 @@ async def test_owner_gets_the_heatmap_bytes():
     assert result == HEATMAP_PNG
 
 
+async def test_owner_gets_dominant_embedded_pdf_image_heatmap():
+    artifact = Artifact.create(ArtifactType("TEXT"), "bucket/doc.pdf")
+    artifact.analysis = {
+        "document_visual_heatmap_ref": "bucket/jobs/1/a/document_image_1_ela.png"
+    }
+    job = AnalysisJob.create(user_id="user-a", artifacts=[artifact])
+    use_case = GetArtifactHeatmapUseCase(
+        repository=FakeRepository(job),
+        storage=FakeStorage({"bucket/jobs/1/a/document_image_1_ela.png": HEATMAP_PNG}),
+    )
+
+    result = await use_case.execute("job-1", artifact.artifact_id, user_id="user-a")
+
+    assert result == HEATMAP_PNG
+
+
 async def test_other_user_gets_nothing():
     job, artifact_id = _job_with_image_artifact("user-a", "bucket/jobs/1/a/ela_heatmap.png")
     use_case = GetArtifactHeatmapUseCase(

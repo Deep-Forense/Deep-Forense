@@ -9,6 +9,7 @@ import { InfoTip } from "@/components/molecules/InfoTip";
 import { ImageClassificationPanel } from "@/features/scan/components/ImageClassificationPanel";
 import { VerdictBadge } from "@/features/scan/components/VerdictBadge";
 import {
+  FLAG_LABELS,
   percentScore,
   VERDICT_PRESENTATION,
 } from "@/features/scan/domain/scanPresentation";
@@ -63,10 +64,13 @@ export default function AdvancedScanResult({
 }) {
   const [previewUrl, setPreviewUrl] = useState("");
   const [realHeatmapUrl, setRealHeatmapUrl] = useState("");
+  const [documentHeatmapUrl, setDocumentHeatmapUrl] = useState("");
   const isImage = file?.type?.startsWith("image/");
   const presentation =
     VERDICT_PRESENTATION[result.verdict] || VERDICT_PRESENTATION.SUSPICIOUS;
   const imageAnalysis = result.imageAnalysis;
+  const documentAnalysis = result.documentAnalysis;
+  const documentHeatmapPath = documentAnalysis?.document_visual_heatmap_url;
   const heatmapPath = imageAnalysis?.ela_heatmap_url;
 
   useEffect(() => {
@@ -100,6 +104,22 @@ export default function AdvancedScanResult({
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [heatmapPath]);
+
+  useEffect(() => {
+    if (!documentHeatmapPath) {
+      setDocumentHeatmapUrl("");
+      return undefined;
+    }
+    let cancelled = false;
+    let objectUrl = "";
+    fetchElaHeatmapObjectUrl(documentHeatmapPath).then((url) => {
+      if (!cancelled) { objectUrl = url; setDocumentHeatmapUrl(url); }
+    }, () => { if (!cancelled) setDocumentHeatmapUrl(""); });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [documentHeatmapPath]);
 
   return (
     <motion.div
@@ -196,6 +216,155 @@ export default function AdvancedScanResult({
 
       {imageAnalysis && <ImageClassificationPanel analysis={imageAnalysis} />}
 
+      {documentAnalysis && (
+        <section className="rounded-3xl border border-border-soft bg-white p-5">
+          <h3 className="font-bold text-secondary">Análisis del documento PDF</h3>
+          <p className="mt-1 text-xs text-text-soft">
+            Extracción por página, comprobaciones aritméticas y análisis estadístico cuando corresponde.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <SignalCard
+              label="Benford documental"
+              score={documentAnalysis.benford_score}
+              unavailableText={documentAnalysis.benford_applicable === false ? "No aplicable" : "Sin datos suficientes"}
+              explanation={<p>Solo se aplica con al menos 30 montos diversos y distribuidos en dos órdenes de magnitud. Una desviación no demuestra fraude.</p>}
+            />
+            <SignalCard
+              label="Coherencia aritmética"
+              score={documentAnalysis.document_consistency_score}
+              unavailableText="No se identificaron subtotal, impuestos y total"
+              explanation={<p>Comprueba de forma determinista si subtotal más impuestos coincide con el total reportado.</p>}
+            />
+            <div className="rounded-2xl border border-border-soft bg-slate-50 p-4">
+              <p className="text-[10px] font-bold uppercase text-text-soft">Páginas procesadas</p>
+              <strong className="mt-2 block text-2xl text-secondary">
+                {documentAnalysis.document_analyzed_pages ?? "—"}/{documentAnalysis.document_page_count ?? "—"}
+              </strong>
+              <p className="mt-1 text-[10px] text-text-soft">
+                {documentAnalysis.document_truncated ? "El análisis se limitó a las primeras páginas" : "Documento procesado completamente"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border-soft bg-slate-50 p-4">
+              <p className="text-[10px] font-bold uppercase text-text-soft">Contenido detectado</p>
+              <p className="mt-2 text-xs text-secondary">Texto digital: {documentAnalysis.document_text_layer_pages ?? 0} páginas</p>
+              <p className="mt-1 text-xs text-secondary">OCR: {documentAnalysis.document_ocr_pages ?? 0} páginas</p>
+              <p className="mt-1 text-xs text-secondary">Imágenes: {documentAnalysis.document_embedded_images ?? 0}</p>
+            </div>
+          </div>
+          {(documentAnalysis.ai_flags || []).length > 0 && (
+            <div className="mt-4 rounded-2xl bg-amber-50 p-4">
+              <p className="text-xs font-bold text-amber-800">Indicadores para revisión</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-800">
+                {[...new Set(documentAnalysis.ai_flags)].map((flag) => (
+                  <li key={flag}>{FLAG_LABELS[flag] || flag.replaceAll("_", " ")}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {(documentAnalysis.analysis_warnings || []).length > 0 && (
+            <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-xs text-blue-800">
+              <p className="font-bold">Análisis parcial</p>
+              <p className="mt-1">Algún proveedor no estuvo disponible. Se conservaron las evidencias técnicas y estructurales obtenidas.</p>
+            </div>
+          )}
+          {(documentAnalysis.document_consistency_checks || []).length > 0 && (
+            <div className="mt-4 rounded-2xl border border-border-soft p-4">
+              <p className="text-xs font-bold text-secondary">Comprobaciones aritméticas</p>
+              <div className="mt-2 space-y-2">
+                {documentAnalysis.document_consistency_checks.map((check, index) => (
+                  <div key={`${check.rule}-${check.line || index}`} className="flex items-center justify-between gap-3 text-xs">
+                    <span className="text-text-soft">{check.rule.replaceAll("_", " ")}{check.line ? ` · línea ${check.line}` : ""}</span>
+                    <span className={check.passed ? "font-bold text-emerald-600" : "font-bold text-red-600"}>{check.passed ? "Correcto" : `Diferencia ${check.difference}`}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {(documentAnalysis.document_visual_evidence || []).length > 0 && (
+            <div className="mt-5">
+              <h4 className="text-sm font-bold text-secondary">Imágenes originales extraídas del PDF</h4>
+              <p className="mt-1 text-xs text-text-soft">
+                Las funciones asignadas son candidatas heurísticas; no demuestran que un elemento sea una firma o sello.
+              </p>
+              {documentHeatmapUrl && (
+                <div className="mt-4">
+                  <HeatmapViewer
+                    heatmapUrl={documentHeatmapUrl}
+                    score={documentAnalysis.document_visual_score}
+                    label="ELA de la imagen embebida con mayor señal técnica"
+                  />
+                </div>
+              )}
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {documentAnalysis.document_visual_evidence.map((evidence) => (
+                  <article key={evidence.index} className="rounded-2xl border border-border-soft bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-secondary">Imagen {evidence.index} · página {evidence.page}</p>
+                        <p className="mt-1 text-[10px] text-text-soft">{evidence.width}×{evidence.height} · {evidence.role.replaceAll("_", " ")}</p>
+                      </div>
+                      <strong className="text-lg text-primary">{percentScore(evidence.technical_score) == null ? "—" : `${percentScore(evidence.technical_score)}%`}</strong>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px] text-text-soft">
+                      <span>EXIF<br /><b>{percentScore(evidence.exif_score) == null ? "—" : `${percentScore(evidence.exif_score)}%`}</b></span>
+                      <span>ELA<br /><b>{percentScore(evidence.ela_score) == null ? "—" : `${percentScore(evidence.ela_score)}%`}</b></span>
+                      <span>DCT<br /><b>{percentScore(evidence.dct_benford_score) == null ? "—" : `${percentScore(evidence.dct_benford_score)}%`}</b></span>
+                    </div>
+                    {evidence.duplicate_of && <p className="mt-3 text-[10px] text-amber-700">Coincide exactamente con la imagen {evidence.duplicate_of}.</p>}
+                    {!evidence.cognitive_available && <p className="mt-3 text-[10px] text-text-soft">IA visual no disponible; se conservaron las señales técnicas.</p>}
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+          {documentAnalysis.pdf_structure && (
+            <div className="mt-5 rounded-2xl border border-border-soft p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-bold text-secondary">Estructura y autenticidad del PDF</h4>
+                  <p className="mt-1 text-xs text-text-soft">La presencia de software, formularios o revisiones no implica fraude por sí sola.</p>
+                </div>
+                <span className="rounded-full bg-background px-3 py-1 text-xs font-bold text-primary">
+                  Riesgo estructural {percentScore(documentAnalysis.pdf_structure_score) ?? 0}%
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl bg-slate-50 p-3"><b>Revisiones</b><p className="mt-1 text-text-soft">{documentAnalysis.pdf_structure.incremental_updates ?? 0} incrementales</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><b>Elementos interactivos</b><p className="mt-1 text-text-soft">{documentAnalysis.pdf_structure.form_fields ?? 0} campos · {documentAnalysis.pdf_structure.annotations ?? 0} anotaciones</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><b>Contenido adicional</b><p className="mt-1 text-text-soft">{documentAnalysis.pdf_structure.embedded_files?.length ?? 0} adjuntos · {documentAnalysis.pdf_structure.optional_content_groups ?? 0} capas</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><b>Composición</b><p className="mt-1 text-text-soft">{documentAnalysis.pdf_structure.unique_fonts ?? 0} fuentes · {documentAnalysis.pdf_structure.overlapping_text_image_objects ?? 0} superposiciones</p></div>
+              </div>
+              {(documentAnalysis.pdf_structure.active_content || []).length > 0 && (
+                <p className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">Contenido activo: {documentAnalysis.pdf_structure.active_content.join(", ")}</p>
+              )}
+              {(documentAnalysis.pdf_structure_flags || []).length > 0 && (
+                <ul className="mt-3 list-disc space-y-1 rounded-xl bg-amber-50 p-3 pl-8 text-xs text-amber-800">
+                  {documentAnalysis.pdf_structure_flags.map((flag) => <li key={flag}>{FLAG_LABELS[flag] || flag.replaceAll("_", " ")}</li>)}
+                </ul>
+              )}
+              {(documentAnalysis.pdf_structure.editing_software_detected || []).length > 0 && (
+                <p className="mt-3 text-xs text-text-soft">Software declarado: {documentAnalysis.pdf_structure.editing_software_detected.join(", ")}. Es información contextual, no una condena.</p>
+              )}
+              {(documentAnalysis.pdf_structure.digital_signatures || []).length > 0 ? (
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-bold text-secondary">Firmas digitales</p>
+                  {documentAnalysis.pdf_structure.digital_signatures.map((signature, index) => (
+                    <div key={`${signature.field_name}-${index}`} className="rounded-xl bg-slate-50 p-3 text-xs">
+                      <p className="font-semibold text-secondary">{signature.field_name || `Firma ${index + 1}`} · {signature.validation_status}</p>
+                      <p className="mt-1 text-text-soft">Integridad: {signature.intact ? "conservada" : "no confirmada"} · Certificado confiable localmente: {signature.trusted ? "sí" : "no confirmado"}</p>
+                      {signature.signer_subject && <p className="mt-1 truncate text-text-soft">Firmante: {signature.signer_subject}</p>}
+                      {signature.modification_level && <p className="mt-1 text-text-soft">Cambios posteriores: {signature.modification_level}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-text-soft">No se encontraron firmas digitales embebidas. Una firma manuscrita visible es una imagen y se reporta en la evidencia visual.</p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
       {imageAnalysis && (
         <section className="rounded-3xl border border-border-soft bg-white p-5">
           <h3 className="font-bold text-secondary">Señales técnicas reales</h3>
@@ -217,10 +386,10 @@ export default function AdvancedScanResult({
               explanation={
                 <>
                   <p>
-                    Heurística acumulativa: sin EXIF +20%; software de edición
-                    +45%; fechas distintas +35%; fecha original eliminada +15%.
+                    Heurística acumulativa: software de edición +45%; fechas
+                    distintas +35%; fecha original eliminada +15%.
                   </p>
-                  <p>No tener EXIF no prueba manipulación.</p>
+                  <p>No tener EXIF suma 0% porque es común que aplicaciones y redes sociales lo eliminen.</p>
                 </>
               }
             />
@@ -265,7 +434,7 @@ export default function AdvancedScanResult({
         </section>
       )}
 
-      {!imageAnalysis && (
+      {!imageAnalysis && !documentAnalysis && (
         <section className="rounded-3xl border border-border-soft bg-white p-5 text-sm text-text-soft">
           Este artefacto no contiene análisis visual. Los detalles disponibles
           dependen del tipo de archivo procesado.

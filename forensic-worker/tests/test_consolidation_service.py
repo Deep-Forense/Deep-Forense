@@ -86,3 +86,20 @@ def test_invalid_policy_fails_fast():
 def test_empty_artifact_list_is_rejected():
     with pytest.raises(ValueError):
         ConsolidationService().consolidate([])
+
+
+def test_incomplete_low_risk_analysis_is_inconclusive_not_approved():
+    consolidated = ConsolidationService().consolidate([
+        ScoredArtifact("doc", "TEXT", 0.0, analysis_complete=False)
+    ])
+    assert consolidated["verdict"] == "INCONCLUSIVE"
+    assert consolidated["authenticity_percentage"] is None
+    assert consolidated["risk_percentage"] == 0
+    assert consolidated["analysis_complete"] is False
+
+
+def test_incomplete_analysis_does_not_hide_detected_high_risk():
+    consolidated = ConsolidationService().consolidate([
+        ScoredArtifact("doc", "TEXT", 0.9, analysis_complete=False)
+    ])
+    assert consolidated["verdict"] == "REJECTED"

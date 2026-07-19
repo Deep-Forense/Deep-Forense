@@ -38,9 +38,9 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
             String userId = registerUserUseCase.execute(
-                    new RegisterUserCommand(request.email(), request.password())
+                    new RegisterUserCommand(request.name(), request.email(), request.password())
             );
-            return ResponseEntity.status(201).body(Map.of("id", userId, "email", request.email()));
+            return ResponseEntity.status(201).body(Map.of("id", userId, "name", request.name(), "email", request.email()));
         } catch (DuplicateEmailException e) {
             return ResponseEntity.status(409).body(Map.of("error_code", "EMAIL_ALREADY_REGISTERED", "message", e.getMessage()));
         } catch (IllegalArgumentException e) {
@@ -85,6 +85,7 @@ public class AuthController {
     private ResponseEntity<?> toUserResponse(User user) {
         return ResponseEntity.ok(Map.of(
                 "id", user.userId(),
+                "name", user.name(),
                 "email", user.email().value(),
                 "created_at", user.createdAt().toString()
         ));
