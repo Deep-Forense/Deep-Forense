@@ -29,7 +29,7 @@ public class RegisterUserUseCase implements RegisterUserInputPort {
         }
 
         HashedPassword hashedPassword = passwordHasher.hash(command.rawPassword());
-        User user = User.register(email, hashedPassword);
+        User user = User.register(command.name(), email, hashedPassword);
 
         userRepository.save(user);
 
