@@ -10,10 +10,13 @@ import { ScanHistoryTable } from "@/features/scan/components/ScanHistoryTable";
 import { getJobDetail, getScanHistory } from "@/features/scan/services/scan.service";
 import { getApiErrorMessage } from "@/utils/apiError";
 
+const HISTORY_PAGE_SIZE = 10;
+
 export default function DashboardPage() {
   const [scannerKey, setScannerKey] = useState(0);
   const [history, setHistory] = useState([]);
   const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
@@ -25,7 +28,7 @@ export default function DashboardPage() {
     setHistoryLoading(true);
     setHistoryError("");
     try {
-      const data = await getScanHistory({ pageSize: 20 });
+      const data = await getScanHistory({ page: historyPage, pageSize: HISTORY_PAGE_SIZE });
       setHistory(data.items);
       setHistoryTotal(data.total);
     } catch (error) {
@@ -33,9 +36,24 @@ export default function DashboardPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [historyPage]);
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  // setHistoryPage(1) solo dispara loadHistory vía el useEffect si la página
+  // cambia de valor; si ya estábamos en la página 1 hay que recargar a mano.
+  const reloadHistoryFromStart = useCallback(() => {
+    if (historyPage === 1) {
+      loadHistory();
+    } else {
+      setHistoryPage(1);
+    }
+  }, [historyPage, loadHistory]);
+
+  const handleHistoryPageChange = useCallback((newPage) => {
+    const maxPage = Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
+    setHistoryPage(Math.min(Math.max(newPage, 1), maxPage));
+  }, [historyTotal]);
 
   const dashboardStats = useMemo(() => {
     const scored = history.filter((job) => job.riskPercentage != null);
@@ -45,8 +63,8 @@ export default function DashboardPage() {
     const suspicious = history.filter((job) => ["SUSPICIOUS", "REJECTED", "INCONCLUSIVE"].includes(job.verdict)).length;
     return [
       { id: "analyzed", label: "Archivos analizados", value: historyTotal, trend: "Total", tone: "primary" },
-      { id: "risk", label: "Promedio de riesgo", value: `${averageRisk}%`, trend: "Últimos 20", tone: "primary" },
-      { id: "suspicious", label: "Casos sospechosos", value: suspicious, trend: "Últimos 20", tone: "danger" },
+      { id: "risk", label: "Promedio de riesgo", value: `${averageRisk}%`, trend: `Últimos ${HISTORY_PAGE_SIZE}`, tone: "primary" },
+      { id: "suspicious", label: "Casos sospechosos", value: suspicious, trend: `Últimos ${HISTORY_PAGE_SIZE}`, tone: "danger" },
     ];
   }, [history, historyTotal]);
 
@@ -83,7 +101,7 @@ export default function DashboardPage() {
             <p className="mt-2 text-sm text-text-soft">Sube evidencia digital, consulta resultados y revisa tus trabajos recientes.</p>
           </div>
 
-          <ForensicScannerCard key={scannerKey} authenticated onAnalysisCompleted={loadHistory} />
+          <ForensicScannerCard key={scannerKey} authenticated onAnalysisCompleted={reloadHistoryFromStart} />
 
           <section className="mt-8 grid gap-4 md:grid-cols-3" aria-label="Resumen de actividad">
             {dashboardStats.map((stat) => <DashboardStatCard key={stat.id} {...stat} />)}
@@ -94,8 +112,12 @@ export default function DashboardPage() {
               jobs={history}
               loading={historyLoading}
               error={historyError}
-              onRetry={loadHistory}
+              onRetry={reloadHistoryFromStart}
               onViewDetail={viewJobDetail}
+              page={historyPage}
+              pageSize={HISTORY_PAGE_SIZE}
+              total={historyTotal}
+              onPageChange={handleHistoryPageChange}
             />
           </div>
         </Container>
