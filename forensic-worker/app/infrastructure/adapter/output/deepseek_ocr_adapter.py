@@ -40,7 +40,9 @@ class DeepSeekOcrAdapter(OcrPort):
                  base_url: str = _DEEPINFRA_OPENAI_URL, model: str = _MODEL,
                  max_pdf_pages: int = _MAX_PDF_PAGES,
                  max_embedded_images: int = _MAX_EMBEDDED_IMAGES) -> None:
-        self._api_key = api_key
+        self._api_key = api_key.strip() if api_key else ""
+        if not self._api_key:
+            raise ValueError("La API key de DeepSeek OCR está vacía o no configurada.")
         self._client = client
         self._base_url = base_url
         self._model = model

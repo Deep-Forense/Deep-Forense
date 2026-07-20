@@ -73,7 +73,9 @@ def _image_mime(content: bytes) -> str:
 class GeminiVisionAnalyzerAdapter(ImageCognitiveAnalyzerPort):
     def __init__(self, api_key: str, client: httpx.AsyncClient | None = None,
                  base_url: str = _GEMINI_BASE_URL, model: str = _MODEL) -> None:
-        self._api_key = api_key
+        self._api_key = api_key.strip() if api_key else ""
+        if not self._api_key:
+            raise ValueError("La API key de Gemini está vacía o no configurada.")
         self._client = client
         self._base_url = base_url
         self._model = model
