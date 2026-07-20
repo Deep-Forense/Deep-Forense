@@ -1,86 +1,151 @@
-# DeepForense
+# DeepForense — documentación general
 
-Plataforma web para detección de fraude y manipulación en contenido digital (imágenes, documentos, URLs).
+## 1. Propósito
 
-## Estructura del repositorio
+DeepForense es una aplicación web distribuida para recibir imágenes, documentos PDF o una URL directa de imagen, ejecutar un análisis forense asíncrono y presentar un nivel de riesgo junto con las evidencias técnicas disponibles.
 
-```txt
-deepforense/
-├── auth-service/       Java 21 + Spring Boot — Identity Context
-├── forensic-api/       Python 3.11 + FastAPI — Capa 1 (Ingesta)
-├── forensic-worker/    Python 3.11 + Celery — Capas 2 y 3 (Análisis + Consolidación)
-├── frontend/           React + Vite + TypeScript
-├── kong/               Configuración declarativa de Kong (kong.yml)
-├── docs/               SRS, OpenAPI, arquitectura consolidada
-├── docker-compose.yml           # base, común a todos los entornos
-├── docker-compose.override.yml  # solo local (autocargado por Docker Compose)
-├── docker-compose.prod.yml      # solo main, se invoca explícitamente
-└── .env.example
+Esta documentación describe el código observado en el repositorio a 20 de julio de 2026. El contrato consolidado está en [`openapi.yaml`](./openapi.yaml) y los resultados de la revisión técnica en [`AUDITORIA_CODIGO.md`](./AUDITORIA_CODIGO.md).
+
+Recorrido integral de la plataforma:
+
+- [`FLUJO_COMPLETO_APLICACION.md`](./FLUJO_COMPLETO_APLICACION.md): entrada del usuario, frontend, registro/login, Kong, servicios, bases de datos, MinIO, Redis/Celery, procesamiento, polling, resultados, historial, errores y despliegue.
+
+Flujos forenses detallados:
+
+- [`FLUJO_ANALISIS_IMAGENES.md`](./FLUJO_ANALISIS_IMAGENES.md): archivo y URL, EXIF, ELA, DCT/Benford, Gemini, clasificación y cálculo completo.
+- [`FLUJO_ANALISIS_DOCUMENTOS.md`](./FLUJO_ANALISIS_DOCUMENTOS.md): PDF, estructura/firmas, OCR, consistencia, DeepSeek, Benford, imágenes embebidas y resultado. También documenta que la URL de PDF aún no está soportada.
+
+Fundamentos e implementación de algoritmos:
+
+- [`ALGORITMOS_ANALISIS_IMAGENES.md`](./ALGORITMOS_ANALISIS_IMAGENES.md): magic bytes, EXIF, ELA, DCT, Benford, Gemini, clasificación, scoring y sus clases concretas.
+- [`ALGORITMOS_ANALISIS_DOCUMENTOS.md`](./ALGORITMOS_ANALISIS_DOCUMENTOS.md): parsing PDF, firmas, OCR híbrido, normalización, consistencia, DeepSeek, Benford, análisis visual y ensamblaje en código.
+
+## 2. Componentes
+
+| Componente | Tecnología | Responsabilidad | Documentación |
+|---|---|---|---|
+| Frontend | React 18, Vite 6, Axios | Interfaz, autenticación, carga, polling e historial | [`frontend/README.md`](./frontend/README.md) |
+| Kong Gateway | Kong 3.7, DB-less | Punto de entrada, rutas, CORS y rate limiting | [`kong/README.md`](./kong/README.md) |
+| Forensic API | Python 3.11, FastAPI | Validación, ingesta, persistencia y encolado | [`forensic-api/README.md`](./forensic-api/README.md) |
+| Forensic Worker | Python 3.11, Celery | Análisis técnico/cognitivo y consolidación | [`forensic-worker/README.md`](./forensic-worker/README.md) |
+| Auth Service | Java 21, Spring Boot 3.3 | Registro, login, JWT y perfil | [`auth-service/README.md`](./auth-service/README.md) |
+
+Infraestructura: PostgreSQL almacena usuarios; MongoDB, jobs forenses; Redis es broker/backend de Celery; MinIO almacena originales y heatmaps ELA.
+
+## 3. Arquitectura y flujo
+
+```text
+Navegador
+   │ HTTP/JWT
+   ▼
+Kong :8000 ─────► auth-service :8080 ─────► PostgreSQL
+   │
+   └────────────► forensic-api :8000 ──────► MongoDB
+                         │                  ├► MinIO
+                         └► Redis/Celery ──► forensic-worker
+                                                ├► MongoDB / MinIO
+                                                └► DeepSeek / Gemini
 ```
 
-Cada servicio de negocio (`auth-service`, `forensic-api`, `forensic-worker`) sigue **arquitectura hexagonal**:
+1. El usuario se registra o inicia sesión; `auth-service` emite un JWT HS256 con `sub=email` y `userId`.
+2. El frontend envía un archivo o URL a Kong. La API valida bytes/formato, guarda el artefacto en MinIO, crea un job `PENDING` en MongoDB y publica `process_analysis_job` en Redis.
+3. El worker cambia el job a `PROCESSING`, analiza sus artefactos en paralelo, persiste evidencias y consolida el resultado.
+4. El frontend consulta el job cada 1,5 segundos hasta `COMPLETED`, `FAILED` o 40 intentos.
+5. Los jobs autenticados ofrecen detalle completo e historial; los jobs demo muestran una vista básica.
 
-```txt
-domain/            Reglas de negocio puras — sin frameworks, sin DB, sin HTTP
-application/        Casos de uso, orquesta el dominio
-infrastructure/
-  adapter/input/    Adaptadores de entrada (controladores REST, workers de Celery)
-  adapter/output/   Adaptadores de salida (repos, clientes de MongoDB/MinIO/APIs externas)
-```
+Los servicios de negocio aplican una variante de arquitectura hexagonal: `domain` contiene reglas y puertos, `application` casos de uso, e `infrastructure` adaptadores y composición.
 
-## Requisitos previos
+## 4. Puesta en marcha
 
-- Docker y Docker Compose
-- (Opcional para desarrollo fuera de Docker) Java 21, Python 3.11, Node 20
+### Requisitos
 
-## Cómo levantar el proyecto (local / desarrollo)
+- Docker Engine y Docker Compose.
+- Para ejecución nativa: Node.js 20, Java 21/Maven y Python 3.11.
+- Claves externas opcionales para completar el análisis cognitivo.
 
 ```bash
-git clone <repo-url>
-cd deepforense
 cp .env.example .env
-# Completar .env con las API keys reales (DeepSeek, DeepSeek-OCR/DeepInfra, Gemini, Scrapfly)
-
 docker compose up --build
 ```
 
-Docker Compose carga automáticamente `docker-compose.yml` + `docker-compose.override.yml` (no hace falta `-f`). Servicios expuestos:
+En PowerShell, el equivalente de la primera línea es:
 
-| Servicio | URL |
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+Cambiar todas las credenciales y completar las API keys en `.env` antes de un despliegue real.
+
+### URLs de desarrollo
+
+| Recurso | URL |
 |---|---|
-| Frontend (Vite, hot-reload) | http://localhost:5173 |
-| Kong (entrada única de la API) | http://localhost:8000 |
-| Kong Admin API (solo dev) | http://localhost:8001 |
-| MinIO Consola | http://localhost:9001 |
-| **Swagger UI unificado** (contrato completo, `docs/openapi.yaml`) | http://localhost:8085 |
-| Swagger UI de forensic-api (FastAPI, autogenerado, vía Kong) | http://localhost:8000/forensic-docs/docs |
-| Swagger UI de auth-service (springdoc, autogenerado, vía Kong) | http://localhost:8000/auth-docs/swagger-ui.html |
+| Frontend Vite | `http://localhost:5173` |
+| API mediante Kong | `http://localhost:8000` |
+| Kong Admin (solo override local) | `http://localhost:8001` |
+| Swagger consolidado | `http://localhost:8085` |
+| FastAPI Swagger vía Kong | `http://localhost:8000/forensic-docs/docs` |
+| Auth Swagger vía Kong | `http://localhost:8000/auth-docs/swagger-ui.html` |
+| MinIO consola | `http://localhost:9001` |
 
-**Importante:** el frontend y cualquier cliente externo deben llamar siempre a través de Kong (`http://localhost:8000/...`), nunca directo a `auth-service` o `forensic-api`. Ambos servicios solo exponen su puerto dentro de la red interna de Docker (`expose`, sin `ports`), por lo que no son alcanzables directo desde el host. Kong enruta, además de `/api/auth/*` y `/api/forensic/*`, la documentación interactiva de cada servicio bajo `/auth-docs/*` y `/forensic-docs/*` (ver `kong/kong.yml`).
-
-## Cómo se despliega en producción (main)
+Para producción:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Diferencias clave respecto a local: el frontend se sirve compilado (build estático + nginx, sin servidor de Vite) en el puerto 80, y **no** se publican al host los puertos de Postgres/Mongo/Redis/MinIO ni el Admin API de Kong — solo Kong (`8000`) queda accesible desde fuera de la instancia.
+El frontend queda en el puerto 80 y Kong en el 8000. Las bases de datos y el Admin API no se publican al host. El valor de `VITE_API_BASE_URL` se incorpora al bundle durante el build.
 
-## Documentación
+## 5. Variables de entorno
 
-- `docs/deepforense_mvp_consolidado.md` — arquitectura completa (microservicios, DDD, pipeline de 3 capas)
-- `docs/DeepForense_SRS.md` — especificación de requerimientos
-- `docs/openapi.yaml` — contrato de API (importar en Postman/Swagger UI)
+| Grupo | Variables |
+|---|---|
+| PostgreSQL | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` |
+| MongoDB | `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_DB` |
+| MinIO | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_BUCKET` |
+| JWT | `JWT_SECRET`, `JWT_EXPIRATION_MS` |
+| Worker IA | `DEEPSEEK_*`, `DEEPSEEK_OCR_*`, `GEMINI_*` |
+| Reglas | `BENFORD_MIN_AMOUNT_COUNT`, `PDF_MAX_*`, `PDF_IMAGE_ANALYSIS_CONCURRENCY`, `CONSOLIDATION_POLICY` |
+| Frontend | `VITE_API_BASE_URL` |
 
-## Variables de entorno sensibles
+Consulte `.env.example` para valores de desarrollo. No versionar `.env`.
 
-Las siguientes requieren cuenta/API key propia (ver `.env.example`):
+## 6. API resumida
 
-- `DEEPSEEK_API_KEY` — clasificación semántica de texto
-- `DEEPSEEK_OCR_DEEPINFRA_API_KEY` — OCR de documentos (DeepSeek-OCR vía DeepInfra)
-- `GEMINI_API_KEY` — análisis visual de imágenes
-- `SCRAPFLY_API_KEY` — scraping de URLs con contenido HTML
+| Método y ruta | Acceso | Función |
+|---|---|---|
+| `POST /api/auth/register` | Público | Crear usuario |
+| `POST /api/auth/login` | Público | Obtener JWT |
+| `POST /api/auth/logout` | JWT | Descarte lógico del token |
+| `GET /api/auth/me` | JWT | Perfil actual |
+| `POST /api/forensic/demo/analyze` | Público | Crear análisis demo |
+| `POST /api/forensic/analyze` | JWT | Crear análisis asociado al usuario |
+| `GET /api/forensic/jobs` | JWT | Historial paginado propio |
+| `GET /api/forensic/jobs/{id}` | Opcional | Estado y detalle básico/completo |
+| `GET /api/forensic/jobs/{id}/artifacts/{artifactId}/ela-heatmap` | Propietario | PNG de evidencia ELA |
 
-## Estado del proyecto
+La ingesta acepta exactamente uno de `file` o `url`. Los archivos admitidos son PDF, JPEG, PNG y WEBP, con máximo de 50 MB. Una URL debe apuntar directamente a una imagen compatible.
 
-Esqueleto inicial: contenedores, estructura hexagonal por servicio, y stubs de endpoints/tareas documentados con `TODO`. La lógica de negocio real (pipeline, scoring, consolidación) se implementa siguiendo `docs/deepforense_mvp_consolidado.md`.
+## 7. Operación y pruebas
+
+```bash
+# API y worker
+cd forensic-api && python -m pytest
+cd ../forensic-worker && python -m pytest
+
+# Auth
+cd ../auth-service && mvn test
+
+# Frontend
+cd ../frontend && npm ci && npm run build
+
+# Validar Compose
+cd .. && docker compose config --quiet
+```
+
+Para observar la ejecución use `docker compose logs -f kong forensic-api forensic-worker auth-service`. Los datos viven en volúmenes Docker; `docker compose down` conserva datos y `docker compose down -v` los elimina.
+
+## 8. Estados y resultados
+
+Los jobs recorren `PENDING → PROCESSING → COMPLETED|FAILED`. Un job puede terminar `COMPLETED` si al menos un artefacto fue analizado; solo falla cuando todos fallan. Los veredictos consolidados son `APPROVED`, `SUSPICIOUS`, `REJECTED` o `INCONCLUSIVE`. Un resultado forense es una señal de apoyo y no sustituye una pericia humana.
