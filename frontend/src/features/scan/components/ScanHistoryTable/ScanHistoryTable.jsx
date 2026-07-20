@@ -1,5 +1,6 @@
 import { FiClock, FiEye } from "react-icons/fi";
 import { Badge } from "@/components/atoms/Badge";
+import { Pagination } from "@/components/molecules/Pagination";
 
 const statusVariant = {
   COMPLETED: "success",
@@ -8,13 +9,25 @@ const statusVariant = {
 };
 
 const verdictConfig = {
-  APPROVED: { label: "Auténtico", variant: "success" },
+  APPROVED: { label: "Sin riesgo crítico", variant: "success" },
   REJECTED: { label: "Fraudulento", variant: "danger" },
+  SUSPICIOUS: { label: "Requiere revisión", variant: "warning" },
+  INCONCLUSIVE: { label: "Análisis incompleto", variant: "warning" },
   PENDING: { label: "Pendiente", variant: "warning" },
   FAILED: { label: "Fallido", variant: "danger" },
 };
 
-export default function ScanHistoryTable({ jobs, loading = false, error = "", onRetry }) {
+export default function ScanHistoryTable({
+  jobs,
+  loading = false,
+  error = "",
+  onRetry,
+  onViewDetail,
+  page = 1,
+  pageSize = 10,
+  total = 0,
+  onPageChange,
+}) {
   return (
     <section className="overflow-hidden rounded-3xl border border-border-soft bg-white shadow-lg shadow-secondary/5">
       <div className="flex flex-col gap-2 border-b border-border-soft bg-slate-50/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -62,7 +75,14 @@ export default function ScanHistoryTable({ jobs, loading = false, error = "", on
                   <td className="px-4 py-4 font-bold text-secondary">{job.riskPercentage == null ? "—" : `${job.riskPercentage}%`}</td>
                   <td className="px-4 py-4"><Badge variant={verdict.variant}>{verdict.label}</Badge></td>
                   <td className="px-4 py-4 text-center">
-                    <button type="button" aria-label={`Ver ${job.fileName}`} className="rounded-lg p-2 text-text-soft transition hover:bg-tertiary hover:text-primary"><FiEye /></button>
+                    <button
+                      type="button"
+                      aria-label={`Ver ${job.fileName}`}
+                      onClick={() => onViewDetail?.(job)}
+                      className="rounded-lg p-2 text-text-soft transition hover:bg-tertiary hover:text-primary"
+                    >
+                      <FiEye />
+                    </button>
                   </td>
                 </tr>
               );
@@ -70,6 +90,10 @@ export default function ScanHistoryTable({ jobs, loading = false, error = "", on
           </tbody>
         </table>
       </div>
+
+      {!loading && !error && jobs.length > 0 && (
+        <Pagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} itemLabel="análisis" />
+      )}
     </section>
   );
 }

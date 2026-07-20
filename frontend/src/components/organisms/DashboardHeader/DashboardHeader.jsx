@@ -10,8 +10,11 @@ export default function DashboardHeader({ onNewAnalysis }) {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await logout();
-    navigate(paths.home);
+    try {
+      await logout();
+    } finally {
+      navigate(paths.home);
+    }
   };
 
   return (

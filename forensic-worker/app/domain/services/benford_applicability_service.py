@@ -12,7 +12,9 @@ Reglas (BACKLOG.md T2.M7):
 """
 from typing import Optional, Sequence
 
-DEFAULT_MIN_AMOUNT_COUNT = 15
+DEFAULT_MIN_AMOUNT_COUNT = 30
+_MIN_MAGNITUDE_RATIO = 100.0
+_MIN_UNIQUE_RATIO = 0.5
 
 # document_type que DeepSeek clasifica como financieros (prompt de T2.M5
 # restringido a este vocabulario; cualquier otro valor => no financiero).
@@ -47,7 +49,14 @@ class BenfordApplicabilityService:
             return False
         if financial_amounts is None:
             return False
-        return len(financial_amounts) >= self._min_amount_count
+        usable = [abs(float(value)) for value in financial_amounts if float(value) != 0]
+        if len(usable) < self._min_amount_count:
+            return False
+        if max(usable) / min(usable) < _MIN_MAGNITUDE_RATIO:
+            return False
+        if len(set(usable)) / len(usable) < _MIN_UNIQUE_RATIO:
+            return False
+        return True
 
     def applies_to_image(self, content: bytes) -> bool:
         return self.is_jpeg(content)

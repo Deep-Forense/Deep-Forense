@@ -1,58 +1,24 @@
-export const DASHBOARD_STATS = [
-  { id: "analyzed", label: "Archivos analizados", value: "1,284", trend: "+12%", tone: "primary" },
-  { id: "risk", label: "Promedio de riesgo", value: "14.2%", trend: "-2.4%", tone: "primary" },
-  { id: "suspicious", label: "Casos sospechosos", value: "42", trend: "+5", tone: "danger" },
-];
+// Mock temporal mientras el backend no expone "ela_heatmap_url" en ArtifactAnalysis
+// (ver docs/openapi.yaml — GET /jobs/{job_id} aún no incluye ese campo).
+// Misma forma que tendrá el dato real (una URL de imagen) para que, cuando el
+// backend lo agregue, solo cambie la fuente de datos en AdvancedScanResult.jsx.
 
-export const MOCK_SCAN_HISTORY = [
-  {
-    jobId: "job-a14f92",
-    fileName: "nomina_09_2024_verif.pdf",
-    artifactType: "PDF Document",
-    status: "COMPLETED",
-    riskPercentage: 2,
-    authenticityPercentage: 98,
-    verdict: "APPROVED",
-    createdAt: "Hoy, 10:42",
-  },
-  {
-    jobId: "job-b27c51",
-    fileName: "id_card_front_user412.jpg",
-    artifactType: "JPEG Image",
-    status: "COMPLETED",
-    riskPercentage: 88,
-    authenticityPercentage: 12,
-    verdict: "REJECTED",
-    createdAt: "Hoy, 09:18",
-  },
-  {
-    jobId: "job-c39e07",
-    fileName: "invoice_reimbursement.pdf",
-    artifactType: "PDF Document",
-    status: "PROCESSING",
-    riskPercentage: null,
-    authenticityPercentage: null,
-    verdict: "PENDING",
-    createdAt: "Ayer, 17:05",
-  },
-  {
-    jobId: "job-d81b44",
-    fileName: "passport_scan_v3.pdf",
-    artifactType: "PDF Document",
-    status: "COMPLETED",
-    riskPercentage: 11,
-    authenticityPercentage: 89,
-    verdict: "APPROVED",
-    createdAt: "Ayer, 15:31",
-  },
-  {
-    jobId: "job-e53a20",
-    fileName: "contract_signature.png",
-    artifactType: "PNG Image",
-    status: "FAILED",
-    riskPercentage: null,
-    authenticityPercentage: null,
-    verdict: "FAILED",
-    createdAt: "12 jun, 11:20",
-  },
-];
+const MOCK_HEATMAP_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
+  <defs>
+    <radialGradient id="hot" cx="35%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#ff3b30" stop-opacity="0.9"/>
+      <stop offset="45%" stop-color="#ff9500" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#0b1f33" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="warm" cx="72%" cy="66%" r="40%">
+      <stop offset="0%" stop-color="#ffd60a" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#0b1f33" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="360" fill="#0b1f33"/>
+  <rect width="640" height="360" fill="url(#hot)"/>
+  <rect width="640" height="360" fill="url(#warm)"/>
+</svg>`.trim();
+
+export const MOCK_ELA_HEATMAP_URL = `data:image/svg+xml;utf8,${encodeURIComponent(MOCK_HEATMAP_SVG)}`;

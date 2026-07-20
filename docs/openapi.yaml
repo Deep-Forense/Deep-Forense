@@ -225,6 +225,35 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
 
+  /api/forensic/jobs/{job_id}/artifacts/{artifact_id}/ela-heatmap:
+    get:
+      tags: [forensic]
+      summary: Imagen PNG del heatmap ELA de un artifact IMAGE
+      description: >
+        Mismo control de acceso que detail_level=full: solo el dueño del job
+        puede verla (jobs demo no tienen dueño y nunca la exponen).
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: artifact_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Heatmap ELA en PNG
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "404":
+          description: Job, artifact o heatmap no encontrado (o el JWT no es del dueño)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
   /api/forensic/jobs:
     get:
       tags: [forensic]
@@ -342,6 +371,18 @@ components:
             gemini_flags:
               type: array
               items: { type: string }
+            image_classification:
+              type: string
+              nullable: true
+              enum: [AI_GENERATED, AI_MODIFIED, SCREENSHOT, EDITED, AUTHENTIC, INCONCLUSIVE]
+            image_classification_message: { type: string, nullable: true }
+            ela_heatmap_url:
+              type: string
+              nullable: true
+              description: >-
+                Solo presente si el artifact es IMAGE y el heatmap ya fue
+                generado. Ruta relativa servida por este mismo servicio
+                (requiere el mismo JWT que detail_level=full).
 
     JobResult:
       type: object

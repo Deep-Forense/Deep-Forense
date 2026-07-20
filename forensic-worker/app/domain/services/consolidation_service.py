@@ -46,6 +46,7 @@ class ScoredArtifact:
     artifact_id: str
     type: str  # "TEXT" | "IMAGE"
     fraud_score: float
+    analysis_complete: bool = True
 
 
 class ConsolidationService:
@@ -71,11 +72,15 @@ class ConsolidationService:
             fraud_score, dominant = self._weighted_average(scored_artifacts)
 
         fraud_score = round(fraud_score, 4)
+        normal_verdict = verdict_for(fraud_score)
+        incomplete = any(not artifact.analysis_complete for artifact in scored_artifacts)
+        verdict = "INCONCLUSIVE" if incomplete and normal_verdict == "APPROVED" else normal_verdict
         return {
             "fraud_score": fraud_score,
-            "authenticity_percentage": round((1 - fraud_score) * 100),
+            "authenticity_percentage": None if verdict == "INCONCLUSIVE" else round((1 - fraud_score) * 100),
             "risk_percentage": round(fraud_score * 100),
-            "verdict": verdict_for(fraud_score),
+            "verdict": verdict,
+            "analysis_complete": not incomplete,
             "dominant_artifact": dominant.artifact_id,
             "policy_applied": self._policy,
         }

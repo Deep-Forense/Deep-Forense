@@ -12,6 +12,7 @@ from app.domain.ports.analysis_job_repository_port import AnalysisJobRepositoryP
 from app.domain.ports.storage_port import StoragePort
 from app.domain.ports.task_queue_port import TaskQueuePort
 from app.domain.value_objects.artifact_type import ArtifactType
+from uuid import uuid4
 
 
 class SubmitAnalysisUseCase(SubmitAnalysisInputPort):
@@ -30,7 +31,7 @@ class SubmitAnalysisUseCase(SubmitAnalysisInputPort):
 
         # T1.M2: el archivo se guarda en MinIO ANTES de encolar la tarea.
         storage_ref = await self._storage.save(
-            path=f"uploads/{command.file_name}",
+            path=f"uploads/{uuid4().hex}-{command.file_name}",
             content=command.file_bytes,
         )
         artifact = Artifact.create(artifact_type=artifact_type, storage_ref=storage_ref)

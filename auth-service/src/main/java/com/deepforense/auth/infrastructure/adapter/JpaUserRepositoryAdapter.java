@@ -20,7 +20,7 @@ public class JpaUserRepositoryAdapter implements UserRepositoryPort {
     @Override
     public void save(User user) {
         UserJpaEntity entity = new UserJpaEntity(
-                user.userId(), user.email().value(), user.password().value(), user.createdAt()
+                user.userId(), user.name(), user.email().value(), user.password().value(), user.createdAt()
         );
         jpaRepository.save(entity);
     }
@@ -29,7 +29,7 @@ public class JpaUserRepositoryAdapter implements UserRepositoryPort {
     public Optional<User> findByEmail(Email email) {
         return jpaRepository.findByEmail(email.value())
                 .map(e -> User.reconstitute(
-                        e.getId(), new Email(e.getEmail()), new HashedPassword(e.getPasswordHash()), e.getCreatedAt()
+                        e.getId(), e.getName(), new Email(e.getEmail()), new HashedPassword(e.getPasswordHash()), e.getCreatedAt()
                 ));
     }
 

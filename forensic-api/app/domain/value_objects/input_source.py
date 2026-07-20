@@ -5,7 +5,7 @@ SCRAPED_DOM / SCRAPED_DOM_IMAGE para contenido extraído de una URL (Sprint 3).
 """
 from dataclasses import dataclass
 
-_ALLOWED = {"UPLOAD", "SCRAPED_DOM", "SCRAPED_DOM_IMAGE"}
+_ALLOWED = {"UPLOAD", "DIRECT_URL", "SCRAPED_DOM", "SCRAPED_DOM_IMAGE"}
 
 
 @dataclass(frozen=True)

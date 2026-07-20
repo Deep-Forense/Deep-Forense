@@ -1,10 +1,9 @@
-import { analyzeDemo, analyzeAuthenticated, getJob, listJobs } from "@/api/client";
+import apiClient, { analyzeDemo, analyzeAuthenticated, getJob, listJobs } from "@/api/client";
 
 export const scanDemoFile = async (file, mode) => {
   const formData = new FormData();
 
   formData.append("file", file);
-  formData.append("type", mode);
 
   const response = await analyzeDemo(formData);
   return response.data;
@@ -14,7 +13,6 @@ export const scanAuthenticatedFile = async (file, mode) => {
   const formData = new FormData();
 
   formData.append("file", file);
-  formData.append("type", mode);
 
   const response = await analyzeAuthenticated(formData);
   return response.data;
@@ -31,11 +29,27 @@ export const scanUrl = async (url, authenticated = false) => {
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+const CONSOLIDATION_PRESENTATION = {
+  worst_case_dominates: { label: "Prevalece la evidencia de mayor riesgo", description: "Si hay varios elementos, el resultado global toma el porcentaje del elemento con mayor riesgo." },
+  weighted_average: { label: "Promedio ponderado de evidencias", description: "Combina todos los elementos y da mayor peso a las imágenes (70%) que al texto (30%)." },
+};
+
 export const normalizeScanResult = (job) => {
   const consolidated = job.consolidated || {};
   const riskPercentage = consolidated.risk_percentage ?? Math.round((consolidated.fraud_score ?? 0) * 100);
-  const authenticityPercentage = consolidated.authenticity_percentage ?? 100 - riskPercentage;
+  const authenticityPercentage = consolidated.analysis_complete === false
+    ? null
+    : (consolidated.authenticity_percentage ?? 100 - riskPercentage);
   const verdict = consolidated.verdict || "SUSPICIOUS";
+  const artifacts = (job.artifacts || []).map((artifact) => ({
+    artifactId: artifact.artifact_id,
+    type: artifact.type,
+    origin: artifact.origin,
+    status: artifact.status,
+    analysis: artifact.analysis || null,
+  }));
+  const imageArtifact = artifacts.find((artifact) => artifact.type === "IMAGE" && artifact.analysis);
+  const documentArtifact = artifacts.find((artifact) => artifact.type === "TEXT" && artifact.analysis);
 
   return {
     jobId: job.job_id,
@@ -47,19 +61,55 @@ export const normalizeScanResult = (job) => {
     fraudScore: consolidated.fraud_score ?? riskPercentage / 100,
     model: "forensic-worker · pipeline de análisis",
     policyApplied: consolidated.policy_applied || "pending",
+    policyPresentation: CONSOLIDATION_PRESENTATION[consolidated.policy_applied] || {
+      label: "Resultado individual", description: "El resultado se calculó con la evidencia disponible.",
+    },
     summary:
-      verdict === "APPROVED"
+      verdict === "INCONCLUSIVE"
+        ? "El análisis no pudo completar una evaluación crítica; no se afirma autenticidad."
+        : verdict === "APPROVED"
         ? "No se detectaron indicadores críticos en el análisis consolidado."
         : "El análisis detectó indicadores que requieren revisión adicional.",
-    artifacts: job.artifacts || [],
+    artifacts,
+    imageAnalysis: imageArtifact?.analysis || null,
+    documentAnalysis: documentArtifact?.analysis || null,
     createdAt: job.created_at,
     completedAt: job.completed_at,
   };
 };
 
-export const waitForScanResult = async (jobId, { attempts = 40, interval = 1500 } = {}) => {
+export const getJobDetail = async (jobId) => {
+  const { data: job } = await getJob(jobId);
+  return normalizeScanResult(job);
+};
+
+// El heatmap ELA requiere el mismo JWT que detail_level=full: un <img src>
+// directo no lo mandaría, así que se trae como blob autenticado y se
+// expone al <img> como object URL (el caller debe revocarla al desmontar).
+export const fetchElaHeatmapObjectUrl = async (relativeUrl) => {
+  const response = await apiClient.get(relativeUrl, { responseType: "blob" });
+  return URL.createObjectURL(response.data);
+};
+
+// Mapea el status del job a un evento de timeline con el timestamp real en que
+// el frontend lo observó (el backend todavía no persiste un historial de eventos).
+const STATUS_EVENT_TYPE = {
+  PENDING: "JOB_CREATED",
+  PROCESSING: "JOB_PROCESSING",
+  COMPLETED: "JOB_COMPLETED",
+  FAILED: "JOB_FAILED",
+};
+
+export const waitForScanResult = async (jobId, { attempts = 40, interval = 1500, onEvent } = {}) => {
+  let lastStatus = null;
+
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const { data: job } = await getJob(jobId);
+
+    if (job.status !== lastStatus) {
+      lastStatus = job.status;
+      onEvent?.({ type: STATUS_EVENT_TYPE[job.status], timestamp: new Date().toISOString() });
+    }
 
     if (job.status === "COMPLETED") return normalizeScanResult(job);
     if (job.status === "FAILED") throw new Error("El backend no pudo completar el análisis.");
@@ -70,11 +120,11 @@ export const waitForScanResult = async (jobId, { attempts = 40, interval = 1500 
   throw new Error("El análisis continúa procesándose. Inténtalo nuevamente en unos segundos.");
 };
 
-export const submitAndWaitForScan = async ({ file, mode, authenticated }) => {
+export const submitAndWaitForScan = async ({ file, mode, authenticated, onEvent }) => {
   const created = authenticated
     ? await scanAuthenticatedFile(file, mode)
     : await scanDemoFile(file, mode);
-  return waitForScanResult(created.job_id);
+  return waitForScanResult(created.job_id, { onEvent });
 };
 
 export const getScanHistory = async ({ page = 1, pageSize = 20, verdict } = {}) => {
@@ -92,7 +142,7 @@ export const getScanHistory = async ({ page = 1, pageSize = 20, verdict } = {}) 
         artifactType: job.input_source === "URL" ? "URL" : "UPLOAD",
         status: job.status,
         riskPercentage,
-        authenticityPercentage: riskPercentage == null ? null : 100 - riskPercentage,
+        authenticityPercentage: job.verdict === "INCONCLUSIVE" || riskPercentage == null ? null : 100 - riskPercentage,
         verdict: job.verdict || (job.status === "FAILED" ? "FAILED" : "PENDING"),
         createdAt: new Intl.DateTimeFormat("es-EC", {
           dateStyle: "medium",

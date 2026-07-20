@@ -32,6 +32,11 @@ export const analyzeAuthenticated = (formData) =>
 
 export const getJob = (jobId) => apiClient.get(`/api/forensic/jobs/${jobId}`);
 
+export const getElaHeatmap = (jobId, artifactId) =>
+  apiClient.get(`/api/forensic/jobs/${jobId}/artifacts/${artifactId}/ela-heatmap`, {
+    responseType: "blob",
+  });
+
 export const listJobs = (params) => apiClient.get("/api/forensic/jobs", { params });
 
 export default apiClient;

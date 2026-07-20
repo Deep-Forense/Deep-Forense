@@ -56,7 +56,7 @@ def test_duplicated_flags_between_ai_and_gemini_count_once():
         ai_flags=["cloned_region"],
         gemini_flags=["cloned_region"],
     )
-    expected = round(0.3 * (1 / 3), 4)  # 1 bandera distinta
+    expected = 0.4  # edición/composición implica como mínimo revisión
     assert service.score(analysis) == expected
 
 
@@ -65,3 +65,27 @@ def test_score_is_always_in_unit_interval():
         exif_score=1.0, ela_score=1.0, ai_flags=[f"f{i}" for i in range(20)]
     )
     assert 0.0 <= service.score(extreme) <= 1.0
+
+
+def test_ai_generation_flag_imposes_high_risk_floor():
+    analysis = ArtifactAnalysis(exif_score=0.0, ela_score=0.0,
+        ai_flags=["ai_generation_artifacts"], gemini_flags=["ai_generation_artifacts"])
+    assert service.score(analysis) == 0.75
+
+
+def test_edited_flag_imposes_review_floor():
+    analysis = ArtifactAnalysis(exif_score=0.0, ela_score=0.0,
+        ai_flags=["cloned_region"], gemini_flags=["cloned_region"])
+    assert service.score(analysis) == 0.4
+
+
+def test_confirmed_ai_generated_text_has_suspicious_risk_floor():
+    analysis = ArtifactAnalysis(document_type="letter", benford_applicable=False,
+                                ai_flags=["possible_ai_generated_text"])
+    assert service.score(analysis) == 0.65
+
+
+def test_confirmed_ai_edited_text_has_review_risk_floor():
+    analysis = ArtifactAnalysis(document_type="contract", benford_applicable=False,
+                                ai_flags=["possible_ai_edited_text"])
+    assert service.score(analysis) == 0.5

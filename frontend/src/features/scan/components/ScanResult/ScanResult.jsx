@@ -2,17 +2,16 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  FiCheckCircle,
   FiFileText,
   FiImage,
   FiInfo,
   FiLock,
   FiRefreshCw,
 } from "react-icons/fi";
-import { Badge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
 import { AnalysisMetric } from "@/components/molecules/AnalysisMetric";
 import { LockedInsight } from "@/components/molecules/LockedInsight";
+import { VerdictBadge } from "@/features/scan/components/VerdictBadge";
 import { paths } from "@/routes/paths";
 
 const lockedInsights = ["Análisis OCR", "Mapa ELA", "Texto extraído", "Regiones sospechosas"];
@@ -24,7 +23,7 @@ export default function ScanResult({ file, mode, result, onReset }) {
   const FileIcon = mode === "image" ? FiImage : FiFileText;
 
   useEffect(() => {
-    if (!isImage) return undefined;
+    if (!isImage || !(file instanceof Blob)) return undefined;
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
@@ -44,9 +43,7 @@ export default function ScanResult({ file, mode, result, onReset }) {
             <p className="truncate text-xs text-text-soft">{file?.name || "Archivo de demostración"}</p>
           </div>
         </div>
-        <Badge variant="success">
-          <FiCheckCircle /> {result.verdict}
-        </Badge>
+        <VerdictBadge verdict={result.verdict} />
       </div>
 
       <div className="grid gap-6 p-5 md:grid-cols-[0.9fr_1.1fr]">
@@ -73,22 +70,24 @@ export default function ScanResult({ file, mode, result, onReset }) {
         <div className="flex flex-col">
           <div className="space-y-5">
             <AnalysisMetric
-              label="Probabilidad de autenticidad"
+              label="Autenticidad estimada"
               value={result.authenticityPercentage}
-              hint="Estimación inicial del contenido analizado"
+              hint="Complemento del riesgo; no prueba autenticidad"
+              explanation={<><p>Se calcula como 100% menos el riesgo forense.</p><p>Un valor alto significa menos señales detectadas, no certeza de autenticidad.</p></>}
             />
             <AnalysisMetric
-              label="Riesgo de fraude"
+              label="Riesgo forense"
               value={result.riskPercentage}
               tone="risk"
-              hint="Bajo · Revisión recomendada antes de tomar decisiones"
+              hint="Interprete el porcentaje antes de tomar decisiones"
+              explanation={<><p><strong>0–39%:</strong> sin riesgo crítico. <strong>40–70%:</strong> revisión recomendada. <strong>71–100%:</strong> alto riesgo.</p><p>Combina señales técnicas y flags de IA.</p></>}
             />
           </div>
 
           <div className="mt-5 rounded-2xl bg-background p-3">
             <p className="text-[10px] font-bold uppercase tracking-wide text-text-soft">Modelo utilizado</p>
             <p className="mt-1 text-xs font-semibold text-secondary">{result.model}</p>
-            <p className="mt-1 font-mono text-[10px] text-text-soft">{result.policyApplied}</p>
+            <p className="mt-1 text-[10px] text-text-soft">{result.policyPresentation.label}</p>
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
