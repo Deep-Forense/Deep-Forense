@@ -2,6 +2,7 @@
 
 ## 1. Propósito
 
+
 DeepForense es una aplicación web distribuida para recibir imágenes, documentos PDF o una URL directa de imagen, ejecutar un análisis forense asíncrono y presentar un nivel de riesgo junto con las evidencias técnicas disponibles.
 
 Esta documentación describe el código observado en el repositorio a 20 de julio de 2026. El contrato consolidado está en [`openapi.yaml`](./openapi.yaml) y los resultados de la revisión técnica en [`AUDITORIA_CODIGO.md`](./AUDITORIA_CODIGO.md).
