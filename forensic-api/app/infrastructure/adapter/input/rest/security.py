@@ -13,7 +13,7 @@ from typing import Optional
 import jwt
 from fastapi import Header, HTTPException
 
-_ALGORITHM = "HS256"
+_ALGORITHMS = ["HS256", "HS384", "HS512"]
 
 
 class JwtUserResolver:
@@ -26,7 +26,7 @@ class JwtUserResolver:
             return None
         token = authorization[len("Bearer ") :]
         try:
-            payload = jwt.decode(token, self._secret, algorithms=[_ALGORITHM])
+            payload = jwt.decode(token, self._secret, algorithms=_ALGORITHMS)
         except jwt.InvalidTokenError:
             return None
         return payload.get("userId") or payload.get("sub")
