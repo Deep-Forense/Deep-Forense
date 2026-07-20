@@ -75,6 +75,8 @@ plugins:
         - "http://localhost:5173"
         - "http://localhost:5174"
         - "http://32.198.156.63"
+        - "http://deepforense.me"
+        - "https://deepforense.me"
         - "/^https?:\\/\\/.*$/"
       methods:
         - GET
