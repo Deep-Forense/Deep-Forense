@@ -60,3 +60,23 @@ def test_trailing_percentage_after_tax_is_not_taken_as_the_amount():
     )
     assert result.checks[0]["tax"] == 21.0
     assert result.checks[0]["passed"] is True
+
+
+def test_table_layout_with_label_and_amount_on_separate_lines_is_detected():
+    # PDFs generados con una tabla de 2 columnas (etiqueta | valor, p.ej.
+    # reportlab) quedan con la etiqueta y el monto en líneas consecutivas al
+    # extraer texto plano con PyMuPDF get_text() (sin reconstrucción de
+    # layout) en vez de "Subtotal: 13214.98" en una sola línea. Antes del
+    # fix esto devolvía "—" (ningún check) y el total adulterado pasaba
+    # como legítimo (falso negativo real, ver Factura_Prueba_DeepForense).
+    result = DocumentConsistencyService().analyze(
+        "Subtotal:\nUSD 13,214.98\nIVA (12%):\nUSD 1,585.80\n"
+        "Total a pagar:\nUSD 13,950.78\nCondiciones: pago mediante transferencia bancaria"
+    )
+    assert result.checks[0]["subtotal"] == 13214.98
+    assert result.checks[0]["tax"] == 1585.80
+    assert result.checks[0]["reported_total"] == 13950.78
+    assert result.checks[0]["expected_total"] == 14800.78
+    assert result.checks[0]["passed"] is False
+    assert "arithmetic_total_mismatch" in result.flags
+    assert result.score >= 0.4

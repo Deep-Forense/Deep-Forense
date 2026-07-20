@@ -48,18 +48,29 @@ def _number(raw: str) -> float | None:
         return None
 
 
+def _amount_in_line(line: str) -> float | None:
+    cleaned = _PERCENT_FIGURE.sub(" ", _PARENTHETICAL.sub(" ", line))
+    matches = _AMOUNT.findall(cleaned)
+    return _number(matches[-1]) if matches else None
+
+
 def _labeled_amounts(text: str) -> dict[str, float]:
     found: dict[str, float] = {}
-    for line in text.splitlines():
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
         lowered = line.lower()
         for key, labels in _LABELS.items():
             if key in found or not any(label in lowered for label in labels):
                 continue
             if key == "total" and ("subtotal" in lowered or "base imponible" in lowered):
                 continue
-            cleaned = _PERCENT_FIGURE.sub(" ", _PARENTHETICAL.sub(" ", line))
-            matches = _AMOUNT.findall(cleaned)
-            amount = _number(matches[-1]) if matches else None
+            amount = _amount_in_line(line)
+            if amount is None and index + 1 < len(lines):
+                # Layouts de tabla (p.ej. una tabla de reportlab de 2 columnas
+                # etiqueta|valor) separan la etiqueta y el monto en líneas
+                # consecutivas al extraer texto plano con PyMuPDF get_text()
+                # sin reconstrucción de layout.
+                amount = _amount_in_line(lines[index + 1])
             if amount is not None:
                 found[key] = amount
     return found
