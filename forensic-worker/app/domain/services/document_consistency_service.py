@@ -14,10 +14,7 @@ _LABELS = {
     "total": ("total a pagar", "importe total", "grand total", "total"),
 }
 
-# Elementos que suelen aparecer DESPUÉS del monto en la misma línea y que la
-# extracción ("el último número de la línea") tomaría por error como si fueran
-# el monto: notas/referencias entre paréntesis ("(Ref. 2024)") y porcentajes
-# ("21%", con o sin paréntesis). Se eliminan antes de buscar el monto.
+
 _PARENTHETICAL = re.compile(r"\([^)]*\)")
 _PERCENT_FIGURE = re.compile(r"\d[\d.,]*\s*%")
 
@@ -66,10 +63,7 @@ def _labeled_amounts(text: str) -> dict[str, float]:
                 continue
             amount = _amount_in_line(line)
             if amount is None and index + 1 < len(lines):
-                # Layouts de tabla (p.ej. una tabla de reportlab de 2 columnas
-                # etiqueta|valor) separan la etiqueta y el monto en líneas
-                # consecutivas al extraer texto plano con PyMuPDF get_text()
-                # sin reconstrucción de layout.
+
                 amount = _amount_in_line(lines[index + 1])
             if amount is not None:
                 found[key] = amount

@@ -10,7 +10,7 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class TextCognitiveResult:
-    document_type: Optional[str]  # vocabulario de BenfordApplicabilityService o "other"
+    document_type: Optional[str]
     financial_amounts: list = field(default_factory=list)
     ai_flags: list = field(default_factory=list)
 

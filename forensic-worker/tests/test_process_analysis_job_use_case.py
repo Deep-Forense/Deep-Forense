@@ -142,7 +142,7 @@ def _use_case(repository, storage, ela=None, text_analyzer=None, ocr=None,
         image_analyzer=image_analyzer or FakeImageAnalyzer(),
         benford_applicability=BenfordApplicabilityService(min_amount_count=15),
         fraud_scoring=FraudScoringService(),
-        consolidation=ConsolidationService(),  # worst_case_dominates default
+        consolidation=ConsolidationService(),
         image_classification=ImageClassificationService(),
     )
 
@@ -154,16 +154,16 @@ async def test_failing_artifact_does_not_stop_the_others():
     ]
     repository = FakeRepository(artifacts)
     storage = FakeStorage({"bucket/img.jpg": JPEG, "bucket/doc.pdf": b"texto plano utf8"})
-    use_case = _use_case(repository, storage, ela=BrokenEla())  # la imagen fallará
+    use_case = _use_case(repository, storage, ela=BrokenEla())
 
     result = await use_case.execute("job-1")
 
     assert repository.saved_results["a-img"][0] == "FAILED"
     assert repository.saved_results["a-img"][1] is None
     assert repository.saved_results["a-txt"][0] == "COMPLETED"
-    assert result["status"] == "COMPLETED"  # al menos 1 completó
+    assert result["status"] == "COMPLETED"
     assert repository.final[0] == "COMPLETED"
-    # Sprint 3: la consolidación real solo considera los artifacts completados.
+
     consolidated = repository.final[1]
     assert consolidated["policy_applied"] == "worst_case_dominates"
     assert consolidated["dominant_artifact"] == "a-txt"
@@ -193,7 +193,7 @@ async def test_image_artifact_gets_full_analysis_and_heatmap_saved():
     assert status == "COMPLETED"
     assert analysis.exif_score == 0.2
     assert analysis.ela_score == 0.4
-    assert analysis.benford_applicable is True  # es JPEG
+    assert analysis.benford_applicable is True
     assert analysis.dct_benford_score == 0.1
     assert analysis.gemini_flags == ["cloned_region"]
     assert analysis.ai_flags == ["cloned_region"]
@@ -211,7 +211,7 @@ async def test_non_jpeg_image_skips_dct_without_penalty():
     _, analysis = repository.saved_results["a-png"]
     assert analysis.benford_applicable is False
     assert analysis.dct_benford_score is None
-    assert analysis.ela_score is not None  # las demás señales sí corren
+    assert analysis.ela_score is not None
 
 
 async def test_non_financial_text_never_gets_benford_score():
@@ -287,4 +287,4 @@ async def test_already_completed_job_is_idempotent():
     result = await _use_case(repository, storage).execute("job-7")
 
     assert result == {"job_id": "job-7", "status": "COMPLETED"}
-    assert repository.final is None  # no se reescribió nada
+    assert repository.final is None

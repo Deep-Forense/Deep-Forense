@@ -7,9 +7,7 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-// Declara el esquema Bearer/JWT para que Swagger UI muestre el botón
-// "Authorize" y permita probar los endpoints protegidos (/api/auth/me,
-// /api/auth/logout) pegando el access_token devuelto por /api/auth/login.
+
 @Configuration
 public class OpenApiConfig {
 

@@ -1,9 +1,6 @@
 server:
   port: 8080
-  # Permite que Spring reescriba los enlaces generados (p.ej. los que
-  # springdoc usa para Swagger UI) según el header X-Forwarded-Prefix que
-  # Kong inyecta en la ruta /auth-docs (ver kong/kong.yml y README.md), sin
-  # necesidad de un context-path fijo que rompería las rutas /api/auth/*.
+
   forward-headers-strategy: framework
 
 spring:

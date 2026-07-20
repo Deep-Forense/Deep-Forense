@@ -11,4 +11,4 @@ class JobsPage:
     page: int
     page_size: int
     total: int
-    items: list = field(default_factory=list)  # list[AnalysisJob]
+    items: list = field(default_factory=list)

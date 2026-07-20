@@ -49,9 +49,7 @@ class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
         ]
 
     async def mark_processing(self, job_id: str) -> None:
-        # El filtro por status PENDING hace la transición (y su evento)
-        # idempotente ante reintentos de Celery: si ya está PROCESSING el
-        # update no matchea y no se duplica el evento.
+
         await asyncio.to_thread(
             self._collection.update_one,
             {"_id": job_id, "status": "PENDING"},
@@ -89,7 +87,7 @@ class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
                     "consolidated": consolidated,
                     "completed_at": now,
                 },
-                # RF-28: JOB_COMPLETED o JOB_FAILED según el cierre real.
+
                 "$push": {"events": {"type": f"JOB_{status}", "timestamp": now}},
             },
         )

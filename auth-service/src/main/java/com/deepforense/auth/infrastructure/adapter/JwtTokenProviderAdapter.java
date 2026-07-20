@@ -23,7 +23,7 @@ public class JwtTokenProviderAdapter implements TokenProviderPort {
             @Value("${deepforense.jwt.secret}") String secret,
             @Value("${deepforense.jwt.expiration-ms}") long expirationMs
     ) {
-        // El secreto debe tener al menos 256 bits para HS256; en producción usar un valor generado, no el default.
+
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;
     }

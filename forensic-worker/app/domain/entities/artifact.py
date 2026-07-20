@@ -10,7 +10,7 @@ from dataclasses import dataclass
 @dataclass
 class Artifact:
     artifact_id: str
-    type: str  # "TEXT" | "IMAGE"
+    type: str
     storage_ref: str
     status: str = "PENDING"
 

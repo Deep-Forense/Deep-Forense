@@ -10,7 +10,7 @@ import com.deepforense.auth.domain.valueobject.Email;
 import com.deepforense.auth.domain.valueobject.HashedPassword;
 import com.deepforense.auth.domain.valueobject.RawPassword;
 
-/** No lleva @Service: se instancia en infrastructure/config (composition root). */
+
 public class RegisterUserUseCase implements RegisterUserInputPort {
 
     private final UserRepositoryPort userRepository;
@@ -35,7 +35,7 @@ public class RegisterUserUseCase implements RegisterUserInputPort {
 
         userRepository.save(user);
 
-        // En producción: publicar user.pullDomainEvents() a un event bus.
+
 
         return user.userId();
     }

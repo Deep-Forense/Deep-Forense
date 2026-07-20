@@ -62,8 +62,7 @@ class PillowExifAdapter(ExifAnalyzerPort):
                 exif_ifd = exif.get_ifd(_EXIF_IFD)
             except KeyError:
                 exif_ifd = {}
-            # DateTimeOriginal vive normalmente en el Exif IFD, pero algunos
-            # escritores lo dejan en el IFD principal: se aceptan ambos.
+
             date_time_original = exif_ifd.get(_TAG_DATETIME_ORIGINAL) or exif.get(
                 _TAG_DATETIME_ORIGINAL
             )

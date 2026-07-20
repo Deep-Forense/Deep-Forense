@@ -14,11 +14,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Valida el header "Authorization: Bearer <token>" y, si es válido, deja el
- * email del usuario como principal en el SecurityContext para que
- * GET /api/auth/me (y cualquier endpoint protegido) pueda resolver "quién soy".
- */
+
+
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final TokenProviderPort tokenProvider;

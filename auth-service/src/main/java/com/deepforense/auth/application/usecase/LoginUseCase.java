@@ -10,7 +10,7 @@ import com.deepforense.auth.domain.port.TokenProviderPort;
 import com.deepforense.auth.domain.port.UserRepositoryPort;
 import com.deepforense.auth.domain.valueobject.Email;
 
-/** No lleva @Service: se instancia en infrastructure/config (composition root). */
+
 public class LoginUseCase implements LoginInputPort {
 
     private static final long EXPIRES_IN_SECONDS = 3600;

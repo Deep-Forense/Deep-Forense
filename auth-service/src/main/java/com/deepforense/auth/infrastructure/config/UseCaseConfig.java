@@ -10,11 +10,8 @@ import com.deepforense.auth.domain.port.UserRepositoryPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Composition root: los casos de uso NO llevan @Service para que application/
- * siga siendo agnóstico de Spring. Aquí (y solo aquí) se instancian manualmente
- * y se registran como beans para que AuthController los reciba por constructor.
- */
+
+
 @Configuration
 public class UseCaseConfig {
 

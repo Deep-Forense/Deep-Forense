@@ -13,10 +13,10 @@ from app.domain.services.consolidation_service import (
 
 
 def test_worst_case_any_rejected_artifact_rejects_the_whole_job():
-    service = ConsolidationService()  # default: worst_case_dominates
+    service = ConsolidationService()
     scored = [
         ScoredArtifact("a-ok", "TEXT", 0.05),
-        ScoredArtifact("a-malo", "IMAGE", 0.92),  # REJECTED (> 0.7)
+        ScoredArtifact("a-malo", "IMAGE", 0.92),
         ScoredArtifact("a-medio", "IMAGE", 0.5),
     ]
 
@@ -48,7 +48,7 @@ def test_worst_case_middle_score_is_suspicious():
 
 def test_weighted_average_images_weigh_more_than_text():
     service = ConsolidationService(policy="weighted_average")
-    # IMAGE 0.9 (peso 0.7) + TEXT 0.1 (peso 0.3) => 0.9*0.7 + 0.1*0.3 = 0.66
+
     scored = [
         ScoredArtifact("foto", "IMAGE", 0.9),
         ScoredArtifact("texto", "TEXT", 0.1),
@@ -57,7 +57,7 @@ def test_weighted_average_images_weigh_more_than_text():
     consolidated = service.consolidate(scored)
 
     assert consolidated["fraud_score"] == 0.66
-    assert consolidated["verdict"] == "SUSPICIOUS"  # el promedio amortigua el 0.9
+    assert consolidated["verdict"] == "SUSPICIOUS"
     assert consolidated["dominant_artifact"] == "foto"
     assert consolidated["policy_applied"] == "weighted_average"
 
@@ -66,7 +66,7 @@ def test_weighted_average_differs_from_worst_case_on_same_input():
     scored = [ScoredArtifact("foto", "IMAGE", 0.9), ScoredArtifact("texto", "TEXT", 0.1)]
     worst = ConsolidationService().consolidate(scored)
     weighted = ConsolidationService(policy="weighted_average").consolidate(scored)
-    assert worst["verdict"] == "REJECTED"  # worst-case hereda el 0.9
+    assert worst["verdict"] == "REJECTED"
     assert weighted["verdict"] != worst["verdict"]
 
 

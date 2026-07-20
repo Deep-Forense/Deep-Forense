@@ -19,8 +19,7 @@ def _jpeg_with_exif(software=None, date_time=None, date_time_original=None) -> b
     if date_time is not None:
         exif[_TAG_DATETIME] = date_time
     if date_time_original is not None:
-        # Pillow no serializa IFDs anidados escritos vía get_ifd() al guardar
-        # JPEG; se escribe plano (el adaptador acepta ambas ubicaciones).
+
         exif[_TAG_DATETIME_ORIGINAL] = date_time_original
     buffer = io.BytesIO()
     image.save(buffer, format="JPEG", exif=exif)

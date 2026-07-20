@@ -69,7 +69,7 @@ class DeepSeekAnalyzerAdapter(TextCognitiveAnalyzerPort):
             str(item.get("flag")) for item in findings if isinstance(item, dict)
             and item.get("confidence") == "HIGH" and str(item.get("evidence", "")).strip()
         }
-        # Compatibilidad con proveedores/prompts anteriores.
+
         high_flags.update(str(flag) for flag in parsed.get("ai_flags", []) if flag)
 
         critical = high_flags & _AI_ORIGIN_FLAGS

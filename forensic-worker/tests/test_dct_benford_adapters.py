@@ -38,7 +38,7 @@ async def test_dct_rejects_invalid_image():
 
 
 async def test_benford_conformant_series_scores_low():
-    # Serie log-uniforme: sigue Benford por construcción.
+
     random.seed(7)
     values = [10 ** random.uniform(0, 5) for _ in range(5000)]
     score = await BenfordStatisticalAdapter().score(values)
@@ -48,7 +48,7 @@ async def test_benford_conformant_series_scores_low():
 async def test_uniform_series_scores_higher_than_benford_series():
     random.seed(7)
     benford_like = [10 ** random.uniform(0, 5) for _ in range(5000)]
-    uniform = [random.uniform(500, 999) for _ in range(5000)]  # primer dígito 5-9 siempre
+    uniform = [random.uniform(500, 999) for _ in range(5000)]
     benford_score = await BenfordStatisticalAdapter().score(benford_like)
     uniform_score = await BenfordStatisticalAdapter().score(uniform)
     assert uniform_score > benford_score

@@ -47,7 +47,7 @@ from app.infrastructure.adapter.output.pymupdf_structure_analyzer_adapter import
     PyMuPdfStructureAnalyzerAdapter,
 )
 
-# --- Configuración desde entorno (ver docker-compose.yml / .env.example) ----
+
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB", "deepforense_forensic")
@@ -86,7 +86,7 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
 )
 
-# Clientes creados dentro de cada proceso hijo; MongoClient no es fork-safe.
+
 _mongo_client = None
 _minio_client = None
 

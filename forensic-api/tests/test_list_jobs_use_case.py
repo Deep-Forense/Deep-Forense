@@ -49,8 +49,8 @@ async def test_user_only_sees_their_own_jobs_never_others_nor_demo():
         [
             _job("user-a"),
             _job("user-a"),
-            _job("user-b"),  # de otro usuario
-            _job(None),  # job demo, sin dueño
+            _job("user-b"),
+            _job(None),
         ]
     )
     use_case = ListJobsUseCase(repository)
@@ -70,7 +70,7 @@ async def test_pagination_returns_requested_slice():
 
     assert (page_1.page, page_1.page_size, page_1.total) == (1, 3, 7)
     assert len(page_1.items) == 3
-    assert len(page_3.items) == 1  # 7 = 3 + 3 + 1
+    assert len(page_3.items) == 1
 
 
 async def test_verdict_filter_is_forwarded():

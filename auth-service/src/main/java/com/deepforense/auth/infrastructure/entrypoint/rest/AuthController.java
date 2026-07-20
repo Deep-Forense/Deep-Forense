@@ -22,7 +22,7 @@ public class AuthController {
 
     private final RegisterUserInputPort registerUserUseCase;
     private final LoginInputPort loginUseCase;
-    private final UserRepositoryPort userRepository; // para /me: lectura directa, sin caso de uso dedicado
+    private final UserRepositoryPort userRepository;
 
     public AuthController(RegisterUserInputPort registerUserUseCase, LoginInputPort loginUseCase,
                            UserRepositoryPort userRepository) {
@@ -65,8 +65,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout() {
-        // Stateless (JWT sin sesión de servidor): el cliente descarta el token.
-        // Si se requiere revocación real, añadir una blacklist en Redis en Sprint 3/4.
+
         return ResponseEntity.noContent().build();
     }
 

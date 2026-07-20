@@ -1,9 +1,4 @@
-"""Puerto de salida: ImageInspectorPort (FOR-99).
-
-Mide una imagen (dimensiones + hash perceptual) para que
-ArtifactSelectionService pueda decidir con lógica pura. La implementación
-(Pillow) vive en infrastructure/adapter/output.
-"""
+"""Puerto de salida para inspeccionar imágenes."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -12,7 +7,7 @@ from dataclasses import dataclass
 class ImageProbe:
     width: int
     height: int
-    perceptual_hash: int  # aHash 64 bits
+    perceptual_hash: int
 
 
 class ImageInspectorPort(ABC):

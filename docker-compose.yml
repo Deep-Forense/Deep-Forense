@@ -1,21 +1,6 @@
-# DeepForense — Docker Compose base (común a todos los entornos)
-# Sin puertos de infraestructura publicados al host: eso vive en
-# docker-compose.override.yml (autocargado en local) para no repetirlo en
-# docker-compose.prod.yml. Ver README.md para los comandos de cada entorno.
-
-# Nombre de proyecto fijo: sin esto, Docker Compose deriva el nombre de las
-# imagenes (ej. "deepforense-auth-service") del nombre de la carpeta donde
-# corre. Como el checkout de GitHub Actions y la carpeta en la instancia de
-# main tienen nombres distintos al de esta carpeta local, el CD (build en el
-# runner, docker load en la instancia) necesita que el nombre sea siempre el
-# mismo sin importar dónde se ejecute.
 name: deepforense
 
 services:
-
-  # ------------------------------------------------------------------
-  # Infraestructura
-  # ------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: deepforense-postgres
@@ -27,7 +12,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deepforense} -d ${POSTGRES_DB:-deepforense_auth}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-deepforense} -d ${POSTGRES_DB:-deepforense_auth}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -52,9 +41,7 @@ services:
     image: redis:7-alpine
     container_name: deepforense-redis
     restart: unless-stopped
-    # Persistencia: AOF (append-only file, se re-sincroniza cada segundo) +
-    # snapshots RDB de respaldo. Sin esto, cualquier tarea encolada que
-    # forensic-worker no haya consumido aún se pierde si el contenedor se reinicia.
+
     command: redis-server --appendonly yes --appendfsync everysec --save 60 1000
     volumes:
       - redis_data:/data
@@ -80,10 +67,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # ------------------------------------------------------------------
-  # T0.2 (historia FOR-125): crea el bucket deepforense-artifacts al iniciar.
-  # Contenedor one-shot: corre, crea el bucket si no existe, y termina.
-  # ------------------------------------------------------------------
   minio-init:
     image: minio/mc:latest
     container_name: deepforense-minio-init
@@ -101,9 +84,6 @@ services:
       echo 'Bucket listo: '$$MINIO_BUCKET
       "
 
-  # ------------------------------------------------------------------
-  # Kong API Gateway (modo DB-less, config declarativa en kong/kong.yml)
-  # ------------------------------------------------------------------
   kong:
     image: kong:3.7
     container_name: deepforense-kong
@@ -119,14 +99,11 @@ services:
     volumes:
       - ./kong/kong.yml:/kong/kong.yml:ro
     ports:
-      - "8000:8000"   # Proxy (entrada única del frontend)
+      - "8000:8000"
     depends_on:
       - auth-service
       - forensic-api
 
-  # ------------------------------------------------------------------
-  # Microservicios de negocio
-  # ------------------------------------------------------------------
   auth-service:
     build:
       context: ./auth-service
@@ -204,11 +181,6 @@ services:
       minio:
         condition: service_healthy
 
-  # ------------------------------------------------------------------
-  # Frontend
-  # Sin "ports" ni "build.target" aquí: cada entorno decide el target
-  # (dev/prod) y el mapeo de puerto en su propio archivo compose.
-  # ------------------------------------------------------------------
   frontend:
     build:
       context: ./frontend

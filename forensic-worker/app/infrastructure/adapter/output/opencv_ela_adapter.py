@@ -29,12 +29,9 @@ import numpy as np
 from app.domain.ports.ela_analyzer_port import ElaAnalyzerPort, ElaResult
 
 _RECOMPRESSION_QUALITY = 90
-# Media de diff (0-255) que ya se considera señal máxima. Empírico: imágenes
-# sin editar suelen quedar < 8; ediciones locales fuertes superan 20.
+
 _FULL_SCALE_MEAN_DIFF = 25.0
-# Percentil usado para normalizar el heatmap (no el score). 99 en vez de un
-# max() crudo: un solo pixel outlier (ruido puntual de sensor/compresión) no
-# debe aplastar el contraste del resto de la imagen.
+
 _HEATMAP_PERCENTILE = 99
 
 

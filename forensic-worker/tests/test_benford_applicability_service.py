@@ -9,7 +9,7 @@ from app.domain.services.benford_applicability_service import BenfordApplicabili
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 16
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
-MANY_AMOUNTS = [10 ** (i / 10) for i in range(31)]  # 30+ montos y >2 órdenes
+MANY_AMOUNTS = [10 ** (i / 10) for i in range(31)]
 
 
 def test_non_financial_text_never_applies_even_with_many_amounts():

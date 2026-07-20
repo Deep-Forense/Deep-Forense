@@ -70,7 +70,7 @@ async def _submit(
         )
 
     if url is not None:
-        # Únicamente una URL directa a imagen JPEG, PNG o WEBP.
+
         try:
             job = await url_use_case.execute(SubmitUrlAnalysisCommand(user_id=user_id, url=url))
         except (UnsupportedUrlContentError, UrlDownloadError) as exc:
@@ -116,8 +116,7 @@ async def analyze(
 def _consolidated_view(consolidated: Optional[dict], full: bool) -> Optional[dict]:
     if consolidated is None or full:
         return consolidated
-    # dominant_artifact y policy_applied solo se exponen en detail_level=full
-    # (contrato JobResult de docs/openapi.yaml).
+
     return {k: v for k, v in consolidated.items() if k not in ("dominant_artifact", "policy_applied")}
 
 
@@ -183,7 +182,7 @@ async def get_job(
     if job is None:
         raise HTTPException(status_code=404, detail="Job no encontrado.")
 
-    # full solo si el JWT corresponde al dueño del job (jobs de demo no tienen dueño).
+
     full = user_id is not None and job.user_id == user_id
     detail_level = "full" if full else "basic"
     return {

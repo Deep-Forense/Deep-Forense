@@ -85,8 +85,7 @@ class GeminiVisionAnalyzerAdapter(ImageCognitiveAnalyzerPort):
         high = self._high_confidence_flags(findings)
         critical = high & _CRITICAL_AI_FLAGS
 
-        # Una flag que puede forzar REJECTED requiere una segunda evaluación
-        # escéptica. Solo se conserva si ambas llamadas coinciden en HIGH.
+
         if critical:
             candidates = ", ".join(sorted(critical))
             verification_prompt = f"""Verifica de forma independiente y escéptica estos posibles

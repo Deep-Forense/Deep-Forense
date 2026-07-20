@@ -87,18 +87,18 @@ class ProcessAnalysisJobUseCase:
         if status is None:
             return {"job_id": job_id, "status": "JOB_NOT_FOUND"}
         if status not in ("PENDING", "PROCESSING"):
-            # Ya procesado (idempotencia ante reintentos de Celery).
+
             return {"job_id": job_id, "status": status}
 
         await self._repository.mark_processing(job_id)
         artifacts = await self._repository.get_artifacts(job_id)
 
-        # T2.M8: cada artifact en paralelo; la excepción de uno no detiene al resto.
+
         results = await asyncio.gather(
             *(self._process_artifact_safe(job_id, artifact) for artifact in artifacts)
         )
 
-        # FOR-114: el job solo es FAILED si TODOS los artifacts fallaron.
+
         completed_pairs = [
             (artifact, analysis)
             for artifact, analysis in zip(artifacts, results)
@@ -106,7 +106,7 @@ class ProcessAnalysisJobUseCase:
         ]
         job_status = "COMPLETED" if completed_pairs else "FAILED"
 
-        # Capa 3 (FOR-111 + FOR-112/113): scoring por artifact + consolidación.
+
         consolidated = None
         if completed_pairs:
             scored = [
@@ -212,7 +212,7 @@ class ProcessAnalysisJobUseCase:
         applicable = self._benford_applicability.applies_to_text(
             cognitive.document_type, cognitive.financial_amounts
         )
-        # T2.M7: un texto no financiero NUNCA produce benford_score.
+
         benford_score = (
             await self._benford_analyzer.score(cognitive.financial_amounts) if applicable else None
         )
@@ -315,8 +315,7 @@ class ProcessAnalysisJobUseCase:
             content=ela_result.heatmap_png,
         )
 
-        # T2.M3/T2.M7: DCT+Benford solo aplica a JPEG; en otros formatos la
-        # señal se marca no aplicable SIN penalizar el score.
+
         applicable = self._benford_applicability.applies_to_image(content)
         dct_benford_score = None
         if applicable:

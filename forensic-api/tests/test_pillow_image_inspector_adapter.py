@@ -35,13 +35,13 @@ async def test_same_image_at_different_sizes_has_close_hashes():
     large = await adapter.inspect(_gradient_png(400, 300))
     small = await adapter.inspect(_gradient_png(200, 150))
     distance = bin(large.perceptual_hash ^ small.perceptual_hash).count("1")
-    assert distance <= 8  # mismo umbral que ArtifactSelectionService
+    assert distance <= 8
 
 
 async def test_different_images_have_distant_hashes():
     adapter = PillowImageInspectorAdapter()
     a = await adapter.inspect(_gradient_png(300, 300))
-    b = await adapter.inspect(_gradient_png(300, 300, invert=True))  # gradiente invertido
+    b = await adapter.inspect(_gradient_png(300, 300, invert=True))
     distance = bin(a.perceptual_hash ^ b.perceptual_hash).count("1")
     assert distance > 8
 

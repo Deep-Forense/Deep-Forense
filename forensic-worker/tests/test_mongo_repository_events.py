@@ -29,7 +29,7 @@ async def test_mark_processing_pushes_job_processing_event():
     await repository.mark_processing("job-1")
 
     query, update = collection.updates[0]
-    assert query == {"_id": "job-1", "status": "PENDING"}  # idempotencia
+    assert query == {"_id": "job-1", "status": "PENDING"}
     assert update["$set"] == {"status": "PROCESSING"}
     event = update["$push"]["events"]
     assert event["type"] == "JOB_PROCESSING"
@@ -46,7 +46,7 @@ async def test_complete_job_success_pushes_job_completed_event():
     assert update["$set"]["status"] == "COMPLETED"
     event = update["$push"]["events"]
     assert event["type"] == "JOB_COMPLETED"
-    # El timestamp del evento coincide con completed_at (misma transición).
+
     assert event["timestamp"] == update["$set"]["completed_at"]
 
 
@@ -69,4 +69,4 @@ async def test_save_artifact_result_does_not_touch_events():
     await repository.save_artifact_result("job-4", artifact, None)
 
     _, update = collection.updates[0]
-    assert "$push" not in update  # los eventos son del JOB, no por artifact
+    assert "$push" not in update

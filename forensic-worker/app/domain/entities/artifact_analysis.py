@@ -10,18 +10,18 @@ from typing import Optional
 
 @dataclass
 class ArtifactAnalysis:
-    document_type: Optional[str] = None  # solo TEXT
-    financial_amounts: Optional[list] = None  # solo TEXT
-    ai_flags: list = field(default_factory=list)  # TEXT: DeepSeek; IMAGE: Gemini
+    document_type: Optional[str] = None
+    financial_amounts: Optional[list] = None
+    ai_flags: list = field(default_factory=list)
     benford_applicable: Optional[bool] = None
     benford_score: Optional[float] = None
-    exif_score: Optional[float] = None  # solo IMAGE
-    ela_score: Optional[float] = None  # solo IMAGE
-    dct_benford_score: Optional[float] = None  # solo IMAGE
-    gemini_flags: list = field(default_factory=list)  # solo IMAGE
-    image_classification: Optional[str] = None  # solo IMAGE
-    image_classification_message: Optional[str] = None  # solo IMAGE
-    ela_heatmap_ref: Optional[str] = None  # solo IMAGE; storage_ref ('{bucket}/{path}') del PNG en MinIO
+    exif_score: Optional[float] = None
+    ela_score: Optional[float] = None
+    dct_benford_score: Optional[float] = None
+    gemini_flags: list = field(default_factory=list)
+    image_classification: Optional[str] = None
+    image_classification_message: Optional[str] = None
+    ela_heatmap_ref: Optional[str] = None
     document_page_count: Optional[int] = None
     document_analyzed_pages: Optional[int] = None
     document_text_layer_pages: Optional[int] = None

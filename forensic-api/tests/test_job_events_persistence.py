@@ -45,7 +45,7 @@ async def test_find_by_id_exposes_persisted_events():
     repository = MongoAnalysisJobRepository(collection)
     job = _new_job()
     await repository.save(job)
-    # Simula los eventos que el worker agrega con $push durante el pipeline:
+
     collection.docs[job.job_id]["events"].append(
         {"type": "JOB_COMPLETED", "timestamp": job.created_at}
     )
@@ -65,7 +65,7 @@ async def test_resaving_a_loaded_job_preserves_event_history():
     )
 
     loaded = await repository.find_by_id(job.job_id)
-    await repository.save(loaded)  # re-guardar no debe resetear el historial
+    await repository.save(loaded)
 
     events = collection.docs[job.job_id]["events"]
     assert [e["type"] for e in events] == ["JOB_CREATED", "JOB_PROCESSING"]
@@ -76,7 +76,7 @@ async def test_documents_without_events_field_load_as_empty_list():
     repository = MongoAnalysisJobRepository(collection)
     job = _new_job()
     await repository.save(job)
-    del collection.docs[job.job_id]["events"]  # documento previo a RF-28
+    del collection.docs[job.job_id]["events"]
 
     loaded = await repository.find_by_id(job.job_id)
 

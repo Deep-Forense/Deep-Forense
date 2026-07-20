@@ -29,7 +29,7 @@ class SubmitAnalysisUseCase(SubmitAnalysisInputPort):
     async def execute(self, command: SubmitAnalysisCommand) -> str:
         artifact_type = ArtifactType(command.artifact_type)
 
-        # T1.M2: el archivo se guarda en MinIO ANTES de encolar la tarea.
+
         storage_ref = await self._storage.save(
             path=f"uploads/{uuid4().hex}-{command.file_name}",
             content=command.file_bytes,
@@ -37,12 +37,12 @@ class SubmitAnalysisUseCase(SubmitAnalysisInputPort):
         artifact = Artifact.create(artifact_type=artifact_type, storage_ref=storage_ref)
         job = AnalysisJob.create(user_id=command.user_id, artifacts=[artifact])
 
-        # T1.M1: se persiste el job en Mongo con status PENDING y >=1 artifact.
+
         await self._repository.save(job)
 
-        # T1.M3: se encola en Redis para que forensic-worker la consuma.
+
         self._task_queue.enqueue_analysis(job.job_id)
 
-        # En producción: publicar job.pull_domain_events() a un event bus.
+
 
         return job.job_id

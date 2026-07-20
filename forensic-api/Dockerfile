@@ -1,4 +1,4 @@
-# DeepForense — forensic-api (Python 3.11 + FastAPI)
+
 FROM python:3.11-slim AS build
 WORKDIR /app
 COPY requirements.txt .

@@ -14,7 +14,7 @@ class FakeCollection:
         self.created_indexes: list = []
 
     async def create_index(self, keys):
-        # Mongo real es idempotente: mismas keys => no-op sin excepción.
+
         self.created_indexes.append(keys)
         return "user_id_1_created_at_-1"
 
@@ -34,6 +34,6 @@ async def test_ensure_indexes_is_safe_to_call_repeatedly():
     repository = MongoAnalysisJobRepository(collection)
 
     await repository.ensure_indexes()
-    await repository.ensure_indexes()  # redeploy: no debe lanzar
+    await repository.ensure_indexes()
 
-    assert len(collection.created_indexes) == 2  # ambas llamadas llegan a Mongo, que las ignora
+    assert len(collection.created_indexes) == 2

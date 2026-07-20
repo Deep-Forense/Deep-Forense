@@ -27,7 +27,7 @@ _VALID_POLICIES = {WORST_CASE_DOMINATES, WEIGHTED_AVERAGE}
 VERDICT_APPROVED_BELOW = 0.4
 VERDICT_REJECTED_ABOVE = 0.7
 
-# Pesos por tipo para weighted_average (se normalizan sobre los presentes).
+
 DEFAULT_TYPE_WEIGHTS = {"IMAGE": 0.7, "TEXT": 0.3}
 
 
@@ -44,7 +44,7 @@ class ScoredArtifact:
     """Entrada de la consolidación: un artifact COMPLETED ya puntuado."""
 
     artifact_id: str
-    type: str  # "TEXT" | "IMAGE"
+    type: str
     fraud_score: float
     analysis_complete: bool = True
 
@@ -94,7 +94,7 @@ class ConsolidationService:
         weights = [self._type_weights.get(a.type, 0.5) for a in scored]
         total_weight = sum(weights)
         if total_weight == 0:
-            # Todos con peso 0 configurado: degradar a promedio simple.
+
             weights = [1.0] * len(scored)
             total_weight = float(len(scored))
 

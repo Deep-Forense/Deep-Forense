@@ -11,7 +11,7 @@ _PNG_MAGIC = b"\x89PNG"
 
 def _jpeg_bytes(quality: int = 95) -> bytes:
     image = Image.new("RGB", (128, 128))
-    # Gradiente para que la recompresión tenga contenido real que comprimir.
+
     pixels = image.load()
     for x in range(128):
         for y in range(128):

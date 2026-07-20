@@ -1,4 +1,4 @@
-# DeepForense — auth-service (Java 21 + Spring Boot)
+
 FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /app
 COPY pom.xml ./

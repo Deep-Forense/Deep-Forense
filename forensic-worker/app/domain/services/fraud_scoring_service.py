@@ -18,7 +18,7 @@ from app.domain.services.image_classification_service import risk_floor_for_flag
 
 SIGNAL_WEIGHT = 0.7
 FLAGS_WEIGHT = 0.3
-# Cantidad de banderas distintas con la que el factor de flags llega a 1.0.
+
 FLAGS_SATURATION = 3
 
 
@@ -30,7 +30,7 @@ class FraudScoringService:
         semantic_floor = risk_floor_for_flags(list(distinct_flags))
 
         if not signals:
-            # Sin señales técnicas aplicables: el riesgo lo dictan las banderas.
+
             return round(max(flags_factor, semantic_floor), 4)
 
         signal_mean = sum(signals) / len(signals)

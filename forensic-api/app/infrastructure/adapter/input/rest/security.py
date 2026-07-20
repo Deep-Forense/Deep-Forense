@@ -32,7 +32,7 @@ class JwtUserResolver:
         return payload.get("userId") or payload.get("sub")
 
 
-# Mismo default que auth-service/application.yml para desarrollo local.
+
 _default_resolver = JwtUserResolver(os.getenv("JWT_SECRET", "change-this-secret-in-production"))
 
 

@@ -27,8 +27,7 @@ class ListJobsUseCase(ListJobsInputPort):
         verdict: Optional[str] = None,
     ) -> JobsPage:
         if not user_id:
-            # Defensa en profundidad: el controlador ya exige JWT, pero este
-            # caso de uso jamás debe listar jobs demo (user_id=None/"").
+
             raise ValueError("user_id es obligatorio para listar el historial.")
 
         jobs, total = await self._repository.find_by_user(

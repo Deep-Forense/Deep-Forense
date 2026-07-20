@@ -71,13 +71,13 @@ async def test_image_goes_through_ocr_api(monkeypatch):
 
 async def test_pdf_with_text_layer_skips_ocr_api():
     captured = []
-    text = "Factura No 001-2026. Total: $1,234.56. " * 5  # > umbral de capa de texto
+    text = "Factura No 001-2026. Total: $1,234.56. " * 5
     adapter = DeepSeekOcrAdapter(api_key="k", client=_mock_client("NO DEBERIA LLAMARSE", captured))
 
     result = await adapter.extract_text(_pdf_with_text_layer(text))
 
     assert "Factura No 001-2026" in result
-    assert captured == []  # ni una llamada HTTP
+    assert captured == []
 
 
 async def test_plain_utf8_text_is_returned_directly():

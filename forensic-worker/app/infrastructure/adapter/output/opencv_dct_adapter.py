@@ -17,10 +17,9 @@ import numpy as np
 from app.domain.ports.dct_analyzer_port import DctAnalyzerPort
 
 _BLOCK = 8
-# Se recorta el centro a este tamaño máximo para acotar el costo en imágenes
-# grandes (los coeficientes de una región central son muestra suficiente).
+
 _MAX_ANALYSIS_SIDE = 512
-_MIN_COEFFICIENT = 1e-6  # descarta ceros/ruido numérico
+_MIN_COEFFICIENT = 1e-6
 
 
 class OpenCvDctAdapter(DctAnalyzerPort):
@@ -44,7 +43,7 @@ class OpenCvDctAdapter(DctAnalyzerPort):
 
         blocks_y = crop.shape[0] // _BLOCK
         blocks_x = crop.shape[1] // _BLOCK
-        # Vectorizado: (n_bloques, 8, 8) sin loop por píxel.
+
         blocks = (
             crop.astype(np.float32)
             .reshape(blocks_y, _BLOCK, blocks_x, _BLOCK)
@@ -56,6 +55,6 @@ class OpenCvDctAdapter(DctAnalyzerPort):
         for i, block in enumerate(blocks):
             coefficients[i] = cv2.dct(block)
 
-        ac = np.abs(coefficients.reshape(len(blocks), -1)[:, 1:])  # descarta el DC (índice 0)
+        ac = np.abs(coefficients.reshape(len(blocks), -1)[:, 1:])
         ac = ac[ac > _MIN_COEFFICIENT]
         return ac.tolist()

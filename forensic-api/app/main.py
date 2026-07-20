@@ -28,7 +28,7 @@ from app.infrastructure.adapter.output.minio_storage_adapter import MinioStorage
 from app.infrastructure.adapter.output.mongo_analysis_job_repository import MongoAnalysisJobRepository
 from app.infrastructure.adapter.output.pillow_image_inspector_adapter import PillowImageInspectorAdapter
 
-# --- Configuración desde entorno (ver docker-compose.yml / .env.example) ----
+
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB", "deepforense_forensic")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -36,13 +36,10 @@ MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "deepforense")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "changeme123")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "deepforense-artifacts")
-# Prefijo con el que Kong expone este servicio detrás del proxy (ver
-# kong/kong.yml, route forensic-docs-route). FastAPI usa root_path para
-# generar correctamente los enlaces absolutos de Swagger UI (/docs) sin
-# afectar el matching de las rutas reales de la app.
+
 ROOT_PATH = os.getenv("ROOT_PATH", "")
 
-# --- Adaptadores de salida (infrastructure) ---------------------------------
+
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 analysis_jobs_collection = mongo_client[MONGO_DB_NAME]["analysis_jobs"]
 repository = MongoAnalysisJobRepository(analysis_jobs_collection)
@@ -58,7 +55,7 @@ storage = MinioStorageAdapter(minio_client, bucket=MINIO_BUCKET)
 celery_client = Celery("forensic_api_producer", broker=REDIS_URL, backend=REDIS_URL)
 task_queue = CeleryTaskQueueAdapter(celery_client)
 
-# --- Casos de uso (application) --------------------------------------------
+
 submit_analysis_use_case = SubmitAnalysisUseCase(repository=repository, storage=storage, task_queue=task_queue)
 url_downloader = HttpxUrlDownloaderAdapter()
 submit_url_analysis_use_case = SubmitUrlAnalysisUseCase(
@@ -72,7 +69,7 @@ get_job_use_case = GetJobUseCase(repository=repository)
 list_jobs_use_case = ListJobsUseCase(repository=repository)
 get_artifact_heatmap_use_case = GetArtifactHeatmapUseCase(repository=repository, storage=storage)
 
-# --- FastAPI app + wiring de dependencias -----------------------------------
+
 app = FastAPI(
     title="DeepForense — forensic-api",
     version="0.1.0",
@@ -89,8 +86,7 @@ app.dependency_overrides[GetArtifactHeatmapInputPort] = lambda: get_artifact_hea
 
 @app.on_event("startup")
 async def ensure_mongo_indexes():
-    # FOR-100: índice {user_id: 1, created_at: -1} para el historial paginado.
-    # Idempotente: en un redeploy con el índice ya creado no hace nada.
+
     await repository.ensure_indexes()
 
 app.include_router(analysis_router)

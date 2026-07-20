@@ -10,5 +10,5 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class DownloadedResource:
     content: bytes
-    content_type: str  # content-type reportado por el servidor, sin parámetros (ej. "image/png")
-    file_name: str  # último segmento del path de la URL (para el storage_ref)
+    content_type: str
+    file_name: str

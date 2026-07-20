@@ -16,8 +16,7 @@ DEFAULT_MIN_AMOUNT_COUNT = 30
 _MIN_MAGNITUDE_RATIO = 100.0
 _MIN_UNIQUE_RATIO = 0.5
 
-# document_type que DeepSeek clasifica como financieros (prompt de T2.M5
-# restringido a este vocabulario; cualquier otro valor => no financiero).
+
 FINANCIAL_DOCUMENT_TYPES = frozenset(
     {
         "invoice",

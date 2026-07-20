@@ -10,8 +10,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ElaResult:
-    score: float  # [0.0, 1.0]
-    heatmap_png: bytes  # heatmap listo para guardar como PNG
+    score: float
+    heatmap_png: bytes
 
 
 class ElaAnalyzerPort(ABC):

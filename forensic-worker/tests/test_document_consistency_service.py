@@ -43,8 +43,7 @@ def test_incorrect_line_total_is_flagged():
 
 
 def test_trailing_reference_after_total_is_not_taken_as_the_amount():
-    # Antes del fix, "2024" (una referencia entre paréntesis DESPUÉS del
-    # monto) se tomaba como el total por ser "el último número de la línea".
+
     result = DocumentConsistencyService().analyze(
         "Subtotal: 100,00\nIVA: 12,00\nTotal a pagar: 112,00 (Ref. 2024)"
     )
@@ -53,8 +52,7 @@ def test_trailing_reference_after_total_is_not_taken_as_the_amount():
 
 
 def test_trailing_percentage_after_tax_is_not_taken_as_the_amount():
-    # "IVA (21%): 100,00" — el porcentaje aparece antes del monto entre
-    # paréntesis; debe tomarse 100,00 como el monto del impuesto, no 21.
+
     result = DocumentConsistencyService().analyze(
         "Subtotal: 100,00\nIVA (21%): 21,00\nTotal a pagar: 121,00"
     )
@@ -63,12 +61,7 @@ def test_trailing_percentage_after_tax_is_not_taken_as_the_amount():
 
 
 def test_table_layout_with_label_and_amount_on_separate_lines_is_detected():
-    # PDFs generados con una tabla de 2 columnas (etiqueta | valor, p.ej.
-    # reportlab) quedan con la etiqueta y el monto en líneas consecutivas al
-    # extraer texto plano con PyMuPDF get_text() (sin reconstrucción de
-    # layout) en vez de "Subtotal: 13214.98" en una sola línea. Antes del
-    # fix esto devolvía "—" (ningún check) y el total adulterado pasaba
-    # como legítimo (falso negativo real, ver Factura_Prueba_DeepForense).
+
     result = DocumentConsistencyService().analyze(
         "Subtotal:\nUSD 13,214.98\nIVA (12%):\nUSD 1,585.80\n"
         "Total a pagar:\nUSD 13,950.78\nCondiciones: pago mediante transferencia bancaria"

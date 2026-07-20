@@ -27,7 +27,7 @@ def _to_aggregate(doc: dict) -> AnalysisJob:
             type=ArtifactType(a["type"]),
             storage_ref=a["storage_ref"],
             status=a["status"],
-            # Documentos previos a FOR-98 no traen origin/analysis.
+
             origin=a.get("origin", "UPLOAD"),
             analysis=a.get("analysis"),
         )
@@ -41,12 +41,11 @@ def _to_aggregate(doc: dict) -> AnalysisJob:
         consolidated=doc.get("consolidated"),
         created_at=doc["created_at"],
         completed_at=doc.get("completed_at"),
-        events=doc.get("events", []),  # RF-28; documentos previos no lo traen
+        events=doc.get("events", []),
     )
 
 
-# Índice compuesto para find_by_user (FOR-100): filtro por user_id + orden
-# por created_at descendente. Sin él, cada GET /jobs es un collection scan.
+
 USER_HISTORY_INDEX = [("user_id", 1), ("created_at", -1)]
 
 
@@ -80,8 +79,7 @@ class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
             ],
             "created_at": job.created_at,
             "completed_at": job.completed_at,
-            # RF-28: un job recién creado (events vacío) siembra JOB_CREATED;
-            # si el aggregate ya traía historial (releído de Mongo), se preserva.
+
             "events": job.events
             or [{"type": "JOB_CREATED", "timestamp": job.created_at}],
         }
@@ -107,7 +105,7 @@ class MongoAnalysisJobRepository(AnalysisJobRepositoryPort):
         total = await self._collection.count_documents(query)
         cursor = (
             self._collection.find(query)
-            .sort("created_at", -1)  # más reciente primero
+            .sort("created_at", -1)
             .skip((page - 1) * page_size)
             .limit(page_size)
         )

@@ -23,7 +23,7 @@ def test_all_signals_high_scores_near_one():
 
 
 def test_non_applicable_benford_is_excluded_not_penalized():
-    # Mismas señales, una con benford aplicable (score alto) y otra sin él:
+
     with_benford = ArtifactAnalysis(
         exif_score=0.2, ela_score=0.2, benford_applicable=True, dct_benford_score=1.0
     )
@@ -31,7 +31,7 @@ def test_non_applicable_benford_is_excluded_not_penalized():
         exif_score=0.2, ela_score=0.2, benford_applicable=False, dct_benford_score=None
     )
     assert service.score(without_benford) < service.score(with_benford)
-    # sin benford: media de (0.2, 0.2) * 0.7 = 0.14 — el None no arrastra el score
+
     assert service.score(without_benford) == round(0.7 * 0.2, 4)
 
 
@@ -45,18 +45,18 @@ def test_text_without_signals_is_driven_by_flags_only():
     )
     assert service.score(no_flags) == 0.0
     assert 0.0 < service.score(some_flags) < 1.0
-    assert service.score(saturated) == 1.0  # satura en FLAGS_SATURATION
+    assert service.score(saturated) == 1.0
 
 
 def test_duplicated_flags_between_ai_and_gemini_count_once():
-    # En IMAGE, ai_flags == gemini_flags (mismo origen Gemini): no debe contar doble.
+
     analysis = ArtifactAnalysis(
         exif_score=0.0,
         ela_score=0.0,
         ai_flags=["cloned_region"],
         gemini_flags=["cloned_region"],
     )
-    expected = 0.4  # edición/composición implica como mínimo revisión
+    expected = 0.4
     assert service.score(analysis) == expected
 
 
