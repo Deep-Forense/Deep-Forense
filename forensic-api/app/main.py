@@ -21,7 +21,6 @@ from app.application.use_cases.get_job_use_case import GetJobUseCase
 from app.application.use_cases.list_jobs_use_case import ListJobsUseCase
 from app.application.use_cases.submit_analysis_use_case import SubmitAnalysisUseCase
 from app.application.use_cases.submit_url_analysis_use_case import SubmitUrlAnalysisUseCase
-from app.domain.ports.storage_port import StoragePort
 from app.infrastructure.adapter.input.rest.analysis_controller import router as analysis_router
 from app.infrastructure.adapter.output.celery_task_queue_adapter import CeleryTaskQueueAdapter
 from app.infrastructure.adapter.output.httpx_url_downloader_adapter import HttpxUrlDownloaderAdapter
