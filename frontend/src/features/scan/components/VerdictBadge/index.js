@@ -1,1 +1,1 @@
-export { default, default as VerdictBadge } from "./VerdictBadge";
+﻿export { default as VerdictBadge } from "./VerdictBadge";

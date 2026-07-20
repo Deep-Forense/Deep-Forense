@@ -1,1 +1,1 @@
-export { default, default as HeatmapViewer } from "./HeatmapViewer";
+﻿export { default as HeatmapViewer } from "./HeatmapViewer";

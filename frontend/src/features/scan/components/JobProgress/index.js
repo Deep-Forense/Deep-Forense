@@ -1,1 +1,1 @@
-export { default, default as JobProgress } from "./JobProgress";
+﻿export { default as JobProgress } from "./JobProgress";

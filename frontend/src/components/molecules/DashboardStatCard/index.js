@@ -1,1 +1,1 @@
-export { default, default as DashboardStatCard } from "./DashboardStatCard";
+﻿export { default as DashboardStatCard } from "./DashboardStatCard";

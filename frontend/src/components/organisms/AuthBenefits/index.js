@@ -1,1 +1,1 @@
-export { default, default as AuthBenefits } from "./AuthBenefits";
+﻿export { default as AuthBenefits } from "./AuthBenefits";

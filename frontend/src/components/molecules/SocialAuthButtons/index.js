@@ -1,1 +1,1 @@
-export { default, default as SocialAuthButtons } from "./SocialAuthButtons";
+﻿export { default as SocialAuthButtons } from "./SocialAuthButtons";

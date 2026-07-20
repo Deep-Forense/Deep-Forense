@@ -1,1 +1,1 @@
-export { default, default as ScanHistoryTable } from "./ScanHistoryTable";
+﻿export { default as ScanHistoryTable } from "./ScanHistoryTable";

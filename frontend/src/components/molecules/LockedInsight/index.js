@@ -1,1 +1,1 @@
-export { default, default as LockedInsight } from "./LockedInsight";
+﻿export { default as LockedInsight } from "./LockedInsight";

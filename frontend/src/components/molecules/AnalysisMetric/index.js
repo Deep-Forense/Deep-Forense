@@ -1,1 +1,1 @@
-export { default, default as AnalysisMetric } from "./AnalysisMetric";
+﻿export { default as AnalysisMetric } from "./AnalysisMetric";

@@ -40,8 +40,7 @@ export default function DashboardPage() {
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
-  // setHistoryPage(1) solo dispara loadHistory vía el useEffect si la página
-  // cambia de valor; si ya estábamos en la página 1 hay que recargar a mano.
+
   const reloadHistoryFromStart = useCallback(() => {
     if (historyPage === 1) {
       loadHistory();

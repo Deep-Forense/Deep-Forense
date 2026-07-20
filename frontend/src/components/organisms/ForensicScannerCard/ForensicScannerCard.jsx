@@ -47,7 +47,6 @@ export default function ForensicScannerCard({ authenticated = false, onAnalysisC
     try {
       const result = await submitAndWaitForScan({
         file: selectedFile,
-        mode: activeMode,
         authenticated,
         onEvent: (event) => setProcessingEvents((current) => [...current, event]),
       });

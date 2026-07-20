@@ -1,1 +1,1 @@
-export { default, default as ImageClassificationPanel } from "./ImageClassificationPanel";
+﻿export { default as ImageClassificationPanel } from "./ImageClassificationPanel";

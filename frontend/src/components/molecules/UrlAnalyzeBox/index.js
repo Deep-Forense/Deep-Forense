@@ -1,1 +1,1 @@
-export { default, default as UrlAnalyzeBox } from "./UrlAnalyzeBox";
+﻿export { default as UrlAnalyzeBox } from "./UrlAnalyzeBox";
